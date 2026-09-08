@@ -1,0 +1,34 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: bite-gateway
+  profiles:
+    active: ${RUN_ENV}
+  main:
+    web-application-type: reactive
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      discovery:
+        username: nacos
+        password: bite@123
+        namespace: flashcode-${RUN_ENV}
+        server-addr: ${NACOS_ADDR}
+      config:
+        username: nacos
+        password: bite@123
+        namespace: flashcode-${RUN_ENV}
+        server-addr: ${NACOS_ADDR}
+        file-extension: yaml
+        # 共享配置
+        shared-configs:
+          - data-id: share-common-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            refresh: true
+          - data-id: share-redis-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
+            refresh: true
+
+logging:
+  pattern:
+    console: '[%thread] %-5level %logger{36} - %msg%n'
