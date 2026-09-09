@@ -6,7 +6,7 @@ SET NAMES utf8mb4;
 /******************************************/
 /*   表名称 = config_info                  */
 /******************************************/
-
+create database if not exists `flashcode_nacos_dev` default character set utf8 collate utf8_bin;
 use `flashcode_nacos_dev`;
 CREATE TABLE `config_info`
 (
