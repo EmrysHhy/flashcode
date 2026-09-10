@@ -15,7 +15,7 @@ public class RequirementDTO {
     private Long appId;
     private String requirement;
 
-    public RequirementVO convertVO() {
+    public RequirementVO convertToVO() {
         RequirementVO requirementVO = new RequirementVO();
         BeanUtils.copyProperties(this, requirementVO);
         return requirementVO;

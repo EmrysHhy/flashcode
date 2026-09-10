@@ -1,0 +1,100 @@
+package com.bitejiuyeke.biteportalservice.flash.utils;
+
+import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
+import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Map;
+
+/**
+ * 把模型生成的代码文件写到本地磁盘。
+ * 最终目录形如：当前工作目录/user-code/{appId}/index.html
+ *
+ * @author Emrys
+ * content:
+ */
+@Slf4j
+public class FileWriterUtil {
+
+    /**
+     * 把 files 里的每个文件写到 user-code/{appId}/ 下面。
+     *
+     * @param appId 应用 ID，用作这一层文件夹的名字
+     * @param files key = 相对路径（如 index.html、src/App.vue），value = 文件内容
+     */
+    public static void writeFiles(Long appId, Map<String, String> files) {
+        if (appId == null) {
+            throw new ServiceException("应用ID不能为空");
+        }
+        if (files == null || files.isEmpty()) {
+            return;
+        }
+
+        // 拼出应用根目录：user-code/123
+        // toAbsolutePath：相对路径转成绝对路径（前面会加上进程启动目录）
+        // normalize：把路径里的 . 和 .. 整理干净
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        try {
+            // 创建应用根目录；已存在也不会报错
+            Files.createDirectories(appDir);
+            for (Map.Entry<String, String> entry : files.entrySet()) {
+                // 把 "src/App.vue" 拼到 appDir 后面，并检查不能写出 user-code/123 之外
+                Path target = resolveSafePath(appDir, entry.getKey());
+                if (target == null) {
+                    continue;
+                }
+                // 例如目标是 .../src/App.vue，需要先确保 src 文件夹存在
+                Path parent = target.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                String content = entry.getValue() == null ? "" : entry.getValue();
+                // 有则覆盖，没有则新建
+                Files.writeString(target, content, StandardCharsets.UTF_8);
+            }
+            log.info("应用代码写入完成, appId={}, fileCount={}, dir={}", appId, files.size(), appDir);
+        } catch (IOException e) {
+            log.error("写入应用代码失败, appId={}", appId, e);
+            throw new ServiceException("写入本地文件失败");
+        }
+    }
+
+    /**
+     * 把模型给的相对路径，安全地拼到应用目录后面。
+     *
+     * 例如 appDir = D:/xxx/user-code/123，relativePath = src/App.vue
+     * 结果 = D:/xxx/user-code/123/src/App.vue
+     *
+     * 如果路径想逃出应用目录（如 ../../etc/passwd），返回 null，不写入。
+     */
+    private static Path resolveSafePath(Path appDir, String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return null;
+        }
+        // Windows 的 \ 统一改成 /，方便处理
+        String normalized = relativePath.trim().replace('\\', '/');
+        // 去掉开头的 /，避免被当成绝对路径
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        // resolve：在 appDir 后面拼接相对路径
+        // normalize：把 ../ 展开，例如 a/../b 会变成 b
+        Path target = appDir.resolve(normalized).normalize();
+        // 展开后如果已经跑到 appDir 外面，或根本不是一个文件路径，就拒绝写入
+        if (!target.startsWith(appDir) || target.equals(appDir)) {
+            log.warn("非法文件路径，已跳过: {}", relativePath);
+            return null;
+        }
+        return target;
+    }
+}

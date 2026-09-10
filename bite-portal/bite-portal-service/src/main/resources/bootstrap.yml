@@ -34,6 +34,7 @@ spring:
           - data-id: share-sms-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
             refresh: true
 
+
 logging:
   pattern:
     console: '[%thread] %-5level %logger{36} - %msg%n'

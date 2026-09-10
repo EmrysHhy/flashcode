@@ -11,4 +11,5 @@ public class FlashcodeConstant {
     public static final String APP_DESC = "appDesc";
     public static final String USER_ID = "userId";
     public static final String APP_TYPE = "appType";
+    public static final String USER_CODE_DIR = "user-code";
 }
