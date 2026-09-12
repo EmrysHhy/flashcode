@@ -1,0 +1,3 @@
+com\bitejiuyeke\bitecommonmessage\config\AliSmsConfig.class
+com\bitejiuyeke\bitecommonmessage\service\AliSmsService.class
+com\bitejiuyeke\bitecommonmessage\service\CaptchaService.class

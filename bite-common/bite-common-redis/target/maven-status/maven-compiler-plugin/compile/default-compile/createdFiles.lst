@@ -1,0 +1,3 @@
+com\bitejiuyeke\bitecommonredis\service\RedisService.class
+com\bitejiuyeke\bitecommonredis\config\RedisConfig.class
+com\bitejiuyeke\bitecommonredis\service\RedissonLockService.class

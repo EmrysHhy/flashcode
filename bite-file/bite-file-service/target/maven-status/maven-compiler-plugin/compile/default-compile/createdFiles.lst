@@ -1,0 +1,11 @@
+com\bitejiuyeke\bitefileservice\domain\vo\SignVO.class
+com\bitejiuyeke\bitefileservice\service\impl\OSSFileServiceImpl.class
+com\bitejiuyeke\bitefileservice\domain\dto\SignDTO.class
+com\bitejiuyeke\bitefileservice\domain\vo\FileVO.class
+com\bitejiuyeke\bitefileservice\config\OSSAutoConfiguration.class
+com\bitejiuyeke\bitefileservice\config\OSSProperties.class
+com\bitejiuyeke\bitefileservice\constants\OSSCustomConstants.class
+com\bitejiuyeke\bitefileservice\domain\dto\FileDTO.class
+com\bitejiuyeke\bitefileservice\BiteFileServiceApplication.class
+com\bitejiuyeke\bitefileservice\service\IFileService.class
+com\bitejiuyeke\bitefileservice\controller\FileController.class
