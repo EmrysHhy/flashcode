@@ -14,4 +14,5 @@ public class GenerateAppVO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long appId;
     private String appType;//类型
+    private String url;//预览地址
 }

@@ -1,12 +1,14 @@
 package com.bitejiuyeke.biteadminservice.map.domain.dto;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.List;
 
 /**
  * 地图poi
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class PoiListDTO extends QQMapBaseResponseDTO {
 

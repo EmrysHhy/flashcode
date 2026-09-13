@@ -117,6 +117,33 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+  flashcode-userapp-preview:
+    container_name: flashcode-userapp-preview
+    image: flashcode/userapp
+    build:
+      context: .
+      dockerfile: ./require-image/preview/Dockerfile
+    volumes:
+      - ../data/flashcodedata/flashcode-app/user-preview:/workspace/user-preview
+      - ./require-image/preview/nginx/script:/workspace/scripts
+      - ./require-image/preview/nginx/config/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    restart: always
+    networks:
+      - flashcode_network
+
+
+    # 在同一台主机上，服务之间的依赖关系可以通过 depends_on 来指定。
+    depends_on:
+      flashcode-mysql:
+        condition: service_healthy
+      flashcode-nacos:
+        condition: service_healthy
+      flashcode-redis:
+        condition: service_healthy
+      flashcode-rabbitmq:
+        condition: service_healthy
 
 networks:
   flashcode_network:

@@ -3,10 +3,12 @@ package com.bitejiuyeke.biteadminapi.map.domain.dto;
 import com.bitejiuyeke.bitecommondomain.domain.dto.BasePageReqDTO;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 查询请求DTO
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class PlaceSearchReqDTO extends BasePageReqDTO {
 

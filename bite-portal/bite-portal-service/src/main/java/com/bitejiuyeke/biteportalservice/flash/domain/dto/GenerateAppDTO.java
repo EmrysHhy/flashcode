@@ -1,5 +1,6 @@
 package com.bitejiuyeke.biteportalservice.flash.domain.dto;
 
+import ch.qos.logback.core.joran.action.PreconditionValidator;
 import com.bitejiuyeke.bitecommoncore.utils.BeanCopyUtil;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
@@ -16,8 +17,10 @@ import lombok.Data;
 public class GenerateAppDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long appId;
+
     private AppTypesEnum appType;//类型
 
+    private String url;//预览地址
     public GenerateAppVO convertToVO() {
         GenerateAppVO generateAppVO = new GenerateAppVO();
         BeanCopyUtil.copyProperties(this, generateAppVO);

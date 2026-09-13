@@ -135,7 +135,7 @@
                 <configuration>
                     <!--指定远程服务器的Docker服务访问地址-->
                     <dockerHost>${dockerhost.addr}</dockerHost>
-                    <certPath>${project.basedir}/../../deploy/test/app/config/cert</certPath>
+                    <certPath>${project.basedir}/../../deploy/dev/app/config/cert</certPath>
                     <!--指定私有仓库的访问路径-->
                     <pushRegistry>${dockerregistry.url}</pushRegistry>
                     <!--指定库的用户名与密码-->

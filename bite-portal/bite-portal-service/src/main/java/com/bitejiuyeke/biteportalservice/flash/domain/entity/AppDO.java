@@ -36,6 +36,11 @@ public class AppDO extends BaseDO {
     private String appDoc;
 
     /**
+     * 应用预览地址
+     */
+    private String appPreviewUrl;
+
+    /**
      * 应用类型：0=html, 1=vue3, 2=vue3_spring
      */
     private Integer appType;

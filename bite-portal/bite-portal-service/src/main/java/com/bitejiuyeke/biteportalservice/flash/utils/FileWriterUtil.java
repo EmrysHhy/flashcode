@@ -6,9 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Map;
 
 /**
@@ -26,13 +25,11 @@ public class FileWriterUtil {
      *
      * @param appId 应用 ID，用作这一层文件夹的名字
      * @param files key = 相对路径（如 index.html、src/App.vue），value = 文件内容
+     * @return 应用根目录的绝对路径，例如 .../user-code/123
      */
-    public static void writeFiles(Long appId, Map<String, String> files) {
+    public static Path saveCode(Long appId, Map<String, String> files) {
         if (appId == null) {
             throw new ServiceException("应用ID不能为空");
-        }
-        if (files == null || files.isEmpty()) {
-            return;
         }
 
         // 拼出应用根目录：user-code/123
@@ -42,8 +39,13 @@ public class FileWriterUtil {
                 .toAbsolutePath()
                 .normalize();
         try {
+
+            if (files == null || files.isEmpty()) {
+                return appDir;
+            }
             // 创建应用根目录；已存在也不会报错
             Files.createDirectories(appDir);
+
             for (Map.Entry<String, String> entry : files.entrySet()) {
                 // 把 "src/App.vue" 拼到 appDir 后面，并检查不能写出 user-code/123 之外
                 Path target = resolveSafePath(appDir, entry.getKey());
@@ -60,6 +62,7 @@ public class FileWriterUtil {
                 Files.writeString(target, content, StandardCharsets.UTF_8);
             }
             log.info("应用代码写入完成, appId={}, fileCount={}, dir={}", appId, files.size(), appDir);
+            return appDir;
         } catch (IOException e) {
             log.error("写入应用代码失败, appId={}", appId, e);
             throw new ServiceException("写入本地文件失败");
@@ -67,10 +70,137 @@ public class FileWriterUtil {
     }
 
     /**
+     * 把 user-code/{appId} 下的单个 HTML 复制到 user-preview/{appId}。
+     * 容器工作目录是 /workspace 时，目标即为 /workspace/user-preview/{appId}。
+     *
+     * @return 预览目录的绝对路径
+     */
+    public static Path copyHtmlToPreview(Path loadedCode, Long appId) {
+        Path workAppDir = resolvePreviewDir(loadedCode, appId);
+        try {
+            Files.createDirectories(workAppDir);//创建工作appid目录
+
+            Path source = loadedCode.resolve("index.html");
+            Path target = workAppDir.resolve("dist/index.html");
+            Files.createDirectories(target.getParent());
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+            log.info("HTML 已复制到预览目录, src={}, dest={}", source, target);
+            return workAppDir;
+        } catch (IOException e) {
+            log.error("复制 HTML 到预览目录失败, appId={}", appId, e);
+            throw new ServiceException("复制预览文件失败");
+        }
+    }
+
+    /**
+     * 把 user-code/{appId} 下的 dist 目录复制到 user-preview/{appId}。
+     * 容器工作目录是 /workspace 时，目标即为 /workspace/user-preview/{appId}。
+     *
+     * @param frontDir
+     * @param appId
+     */
+    public static void copyDistPreview(Path frontDir, Long appId) {
+        Path workAppDir = resolvePreviewDir(frontDir, appId); //校验并且生成绝对路径
+        //校验dist目录
+        Path distDir = frontDir.resolve("dist");
+        if (!Files.isDirectory(distDir)) {
+            throw new ServiceException("dist目录不存在");
+        }
+        try {
+            copyDirectory(distDir, workAppDir.resolve("dist"));
+            log.info("dist 已复制到预览目录, src={}, dest={}", distDir, workAppDir);
+        } catch (IOException e) {
+            log.error("复制 dist 到预览目录失败, appId={}", appId, e);
+            throw new ServiceException("复制预览文件失败");
+        }
+    }
+
+    /**
+     * 把 source 目录里的内容拷到 target。
+     * user-code 和 user-preview 往往不在同一块盘/挂载上，Files.move 会失败，所以按文件树复制。
+     */
+    private static void copyDirectory(Path source, Path target) throws IOException {
+        if (source == null || !Files.isDirectory(source)) {
+            throw new ServiceException("源目录不存在");
+        }
+        Files.createDirectories(target);
+        Files.walkFileTree(source, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Files.createDirectories(target.resolve(source.relativize(dir)));
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path dest = target.resolve(source.relativize(file));
+                Files.copy(file, dest, StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    /**
+     * 把 user-code/{appId} 下的 jar 包复制到 user-preview/{appId}。
+     * 容器工作目录是 /workspace 时，目标即为 /workspace/user-preview/{appId}。
+     *
+     * @param backDir
+     * @param appId
+     */
+    public static Path copyJarPreview(Path backDir, Long appId) {
+        Path workAppDir = resolvePreviewDir(backDir, appId);
+        Path mavenTargetDir = backDir.resolve("target");
+        if (!Files.isDirectory(mavenTargetDir)) {
+            throw new ServiceException("target目录不存在");
+        }
+        try {
+            Files.createDirectories(workAppDir);
+            Path jarFile = findSingleJar(mavenTargetDir);
+            Path target = workAppDir.resolve(jarFile.getFileName());
+            Files.copy(jarFile, target, StandardCopyOption.REPLACE_EXISTING);
+            log.info("jar 已复制到预览目录, src={}, dest={}", jarFile, target);
+            return target;
+        } catch (IOException e) {
+            log.error("复制 jar 到预览目录失败, appId={}", appId, e);
+            throw new ServiceException("复制预览文件失败");
+        }
+
+    }
+
+    /**
+     * 在 maven 的 target 目录中查找唯一的 jar 文件。
+     */
+    private static Path findSingleJar(Path mavenTargetDir) throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(mavenTargetDir, "*.jar")) {
+            for (Path jarFile : stream) {
+                return jarFile;
+            }
+        }
+        throw new ServiceException("未找到 jar 文件");
+    }
+
+    /**
+     * 校验应用 ID 和本地代码目录，并拼出 user-preview/{appId} 的绝对路径。
+     */
+    private static Path resolvePreviewDir(Path sourceDir, Long appId) {
+        if (appId == null) {
+            throw new ServiceException("应用ID不能为空");
+        }
+        if (sourceDir == null || !Files.isDirectory(sourceDir)) {
+            throw new ServiceException("本地代码目录不存在");
+        }
+        return Paths.get(FlashcodeConstant.USER_PREVIEW_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+    }
+
+
+    /**
      * 把模型给的相对路径，安全地拼到应用目录后面。
      *
-     * 例如 appDir = D:/xxx/user-code/123，relativePath = src/App.vue
-     * 结果 = D:/xxx/user-code/123/src/App.vue
+     * 例如 appDir = /workspace/user-code/123，relativePath = src/App.vue
+     * 结果 = /workspace/user-code/123/src/App.vue
      *
      * 如果路径想逃出应用目录（如 ../../etc/passwd），返回 null，不写入。
      */
@@ -97,4 +227,7 @@ public class FileWriterUtil {
         }
         return target;
     }
+
+
+
 }

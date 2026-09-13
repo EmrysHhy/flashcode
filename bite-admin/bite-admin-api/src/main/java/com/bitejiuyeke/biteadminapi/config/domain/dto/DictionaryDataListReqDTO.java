@@ -3,10 +3,12 @@ package com.bitejiuyeke.biteadminapi.config.domain.dto;
 import com.bitejiuyeke.bitecommondomain.domain.dto.BasePageReqDTO;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 字典数据列表DTO
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class DictionaryDataListReqDTO extends BasePageReqDTO {
 

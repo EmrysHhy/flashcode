@@ -2,10 +2,12 @@ package com.bitejiuyeke.biteadminservice.user.domain.vo;
 
 import com.bitejiuyeke.bitecommondomain.domain.vo.LoginUserVO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * B端用户登录信息
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class SysUserLoginVO extends LoginUserVO {
     /**

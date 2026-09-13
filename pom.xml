@@ -44,16 +44,17 @@
         <jaxb.api.version>2.3.1</jaxb.api.version>
         <hutool.version>5.8.25</hutool.version>
         <aliyun.sms.version>3.1.1</aliyun.sms.version>
+        <docker-java.version>3.7.1</docker-java.version>
 
         <!--运行环境-->
-        <runenv>test</runenv>
+        <runenv>dev</runenv>
         <java.opts.default>-Xmx256m</java.opts.default>
 
         <!--系统配置中心-->
-        <nacos.addr>http://你的云服务器内网ip/你的虚拟机内网ip:8848</nacos.addr>
+        <nacos.addr>http://192.168.56.107:8848</nacos.addr>
 
         <!--docker部署配置-->
-        <dockerhost.addr>tcp://你的单机部署云服务器外网ip/你的单机部署虚拟机内网ip:2376</dockerhost.addr>
+        <dockerhost.addr>tcp://192.168.56.107:2376</dockerhost.addr>
         <dockerregistry.url>registry.cn-chengdu.aliyuncs.com</dockerregistry.url>
         <dockerregistry.username>houyj1987@163.com</dockerregistry.username>
         <dockerregistry.password>admin@666777</dockerregistry.password>
@@ -144,6 +145,18 @@
                 <groupId>com.aliyun</groupId>
                 <artifactId>dysmsapi20170525</artifactId>
                 <version>${aliyun.sms.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.docker-java</groupId>
+                <artifactId>docker-java</artifactId>
+                <version>${docker-java.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.docker-java</groupId>
+                <artifactId>docker-java-transport-httpclient5</artifactId>
+                <version>${docker-java.version}</version>
             </dependency>
 
 

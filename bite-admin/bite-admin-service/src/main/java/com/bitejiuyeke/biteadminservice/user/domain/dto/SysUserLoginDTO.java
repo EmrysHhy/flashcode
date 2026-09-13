@@ -3,11 +3,13 @@ package com.bitejiuyeke.biteadminservice.user.domain.dto;
 import com.bitejiuyeke.biteadminservice.user.domain.vo.SysUserLoginVO;
 import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.springframework.beans.BeanUtils;
 
 /**
  * B端登录用户信息DTO
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class SysUserLoginDTO extends LoginUserDTO {
 

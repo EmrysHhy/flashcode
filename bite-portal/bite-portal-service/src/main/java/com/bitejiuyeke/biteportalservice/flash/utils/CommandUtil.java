@@ -1,0 +1,214 @@
+package com.bitejiuyeke.biteportalservice.flash.utils;
+
+import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
+import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.async.ResultCallback;
+import com.github.dockerjava.api.command.InspectExecResponse;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Frame;
+import com.github.dockerjava.api.model.StreamType;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 在指定目录执行本地命令，以及用 Docker 启动生成的 jar。
+ */
+@Slf4j
+public class CommandUtil {
+
+    /**
+     * 在 workDir 下执行一条命令（如 npm install、mvn clean package）。
+     */
+    public static void runCommand(String command, Path workDir) {
+        if (workDir == null || !Files.isDirectory(workDir)) {
+            throw new ServiceException("命令工作目录不存在: " + workDir);
+        }
+        log.info("执行命令: {}, dir={}", command, workDir.toAbsolutePath());
+        boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
+        ProcessBuilder processBuilder = windows
+                ? new ProcessBuilder("cmd.exe", "/c", command)
+                : new ProcessBuilder("sh", "-c", command);
+        processBuilder.directory(workDir.toFile());
+        processBuilder.redirectErrorStream(true);
+        try {
+            Process process = processBuilder.start();
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append('\n');
+                    log.debug("[cmd] {}", line);
+                }
+            }
+            boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new ServiceException("命令执行超时: " + command);
+            }
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                log.error("命令失败, cmd={}, code={}, out=\n{}", command, exitCode, output);
+                throw new ServiceException("命令执行失败: " + command);
+            }
+            log.info("命令完成: {}", command);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceException("命令执行被中断: " + command);
+        } catch (Exception e) {
+            log.error("命令执行异常: {}", command, e);
+            throw new ServiceException("命令执行失败: " + command);
+        }
+    }
+
+    /**
+     * 在已有预览容器（如 flashcode-userapp-preview）里启动 jar。
+     * 容器内路径：/workspace/user-preview/{appId}/{jar}，端口由 appId 算出。
+     *
+     * @param jarOrDir copyJarPreview 返回的 jar 文件，或包含 jar 的预览目录
+     */
+    public static void runJar(DockerClient dockerClient, Path jarOrDir, Long appId, String containerName) {
+        if (dockerClient == null) {
+            throw new ServiceException("DockerClient 未初始化");
+        }
+        if (containerName == null || containerName.isBlank()) {
+            throw new ServiceException("预览容器名不能为空");
+        }
+        Path jarFile = resolveJarFile(jarOrDir);
+        int port = generatePort(appId, FlashcodeConstant.USER_PREVIEW_DIR);
+        String jarName = jarFile.getFileName().toString();
+        String jarInContainer = "/workspace/" + FlashcodeConstant.USER_PREVIEW_DIR + "/" + appId + "/" + jarName;
+        String pidFile = "/tmp/flashcode-" + appId + ".pid";
+        String logFile = "/workspace/" + FlashcodeConstant.USER_PREVIEW_DIR + "/" + appId + "/app.log";
+        String startScript = String.join(" ",
+                "kill $(cat " + pidFile + ") 2>/dev/null || true;",
+                "nohup java -jar " + jarInContainer,
+                "--server.port=" + port,
+                ">" + logFile, "2>&1", "</dev/null &",
+                "echo $! > " + pidFile
+        );
+
+        ensureContainerRunning(dockerClient, containerName);
+        execInContainer(dockerClient, containerName, "启动 jar", "bash", "-c", startScript);
+        log.info("jar 已在容器中启动, appId={}, container={}, port={}, jar={}",
+                appId, containerName, port, jarInContainer);
+        updateNginxConfig(dockerClient, containerName, appId, port);
+    }
+
+    /**
+     * 使用 appId 生成固定端口，范围 8001-9999。
+     * user-develop 部署固定使用 8080。
+     */
+    private static int generatePort(Long appId, String previewDeployPath) {
+        if (FlashcodeConstant.USER_DEVELOP_DIR.equals(previewDeployPath)) {
+            return FlashcodeConstant.JAR_CONTAINER_PORT;
+        }
+        int port = FlashcodeConstant.JAR_HOST_PORT_BASE
+                + (int) (appId % FlashcodeConstant.JAR_HOST_PORT_RANGE);
+        log.info("为 appId {} 分配端口: {}", appId, port);
+        return port;
+    }
+
+    private static void updateNginxConfig(DockerClient dockerClient, String containerName, Long appId, int port) {
+        execInContainer(dockerClient, containerName, "更新 nginx 配置",
+                "bash", FlashcodeConstant.NGINX_UPDATE_SCRIPT, String.valueOf(appId), String.valueOf(port));
+        execInContainer(dockerClient, containerName, "重载 nginx", "nginx", "-s", "reload");
+        log.info("nginx 配置已更新并重载, appId={}, port={}", appId, port);
+    }
+
+    private static void ensureContainerRunning(DockerClient dockerClient, String containerName) {
+        try {
+            var inspect = dockerClient.inspectContainerCmd(containerName).exec();
+            if (Boolean.FALSE.equals(inspect.getState().getRunning())) {
+                dockerClient.startContainerCmd(containerName).exec();
+                log.info("预览容器未运行，已启动: {}", containerName);
+            }
+        } catch (NotFoundException e) {
+            throw new ServiceException("预览容器不存在: " + containerName);
+        }
+    }
+
+    /**
+     * 在指定容器中执行命令，等待结束并校验退出码。
+     */
+    private static void execInContainer(DockerClient dockerClient, String containerName,
+                                        String actionDesc, String... cmd) {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        String execId = dockerClient.execCreateCmd(containerName)
+                .withAttachStdout(true)
+                .withAttachStderr(true)
+                .withCmd(cmd)
+                .exec()
+                .getId();
+        try {
+            dockerClient.execStartCmd(execId)
+                    .exec(new ResultCallback.Adapter<Frame>() {
+                        @Override
+                        public void onNext(Frame frame) {
+                            byte[] payload = frame.getPayload();
+                            if (payload == null || payload.length == 0) {
+                                return;
+                            }
+                            if (frame.getStreamType() == StreamType.STDERR) {
+                                stderr.write(payload, 0, payload.length);
+                            } else {
+                                stdout.write(payload, 0, payload.length);
+                            }
+                        }
+                    })
+                    .awaitCompletion();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceException(actionDesc + "被中断");
+        }
+
+        InspectExecResponse inspect = dockerClient.inspectExecCmd(execId).exec();
+        Long exitCode = inspect.getExitCodeLong();
+        if (exitCode == null || exitCode != 0) {
+            String errorOutput = stderr.toString(StandardCharsets.UTF_8);
+            throw new ServiceException(actionDesc + "失败，退出码=" + exitCode + "，错误输出: " + errorOutput);
+        }
+        if (stdout.size() > 0) {
+            log.info("{} 成功，输出: {}", actionDesc, stdout.toString(StandardCharsets.UTF_8).trim());
+        } else {
+            log.info("{} 成功", actionDesc);
+        }
+    }
+
+    /**
+     * copyJarPreview 返回 jar 文件路径；也兼容传入预览目录再扫描 *.jar。
+     */
+    private static Path resolveJarFile(Path jarOrDir) {
+        if (jarOrDir == null) {
+            throw new ServiceException("预览 jar 路径为空");
+        }
+        if (Files.isRegularFile(jarOrDir) && jarOrDir.getFileName().toString().endsWith(".jar")) {
+            return jarOrDir;
+        }
+        if (!Files.isDirectory(jarOrDir)) {
+            throw new ServiceException("预览目录不存在: " + jarOrDir);
+        }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(jarOrDir, "*.jar")) {
+            for (Path jarFile : stream) {
+                return jarFile;
+            }
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ServiceException("查找 jar 失败");
+        }
+        throw new ServiceException("预览目录中未找到 jar 文件");
+    }
+}

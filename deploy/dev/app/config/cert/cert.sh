@@ -3,14 +3,14 @@
 #vi /lib/systemd/system/docker.service
 #--tlsverify --tlscacert=/etc/docker/ca.pem --tlscert=/etc/docker/server-cert.pem --tlskey=/etc/docker/server-key.pem
 
-SERVER="你的单机部署云服务器外网ip/你的单机部署虚拟机内网ip"
-PASSWORD="123456"
+SERVER="192.168.56.107"
+PASSWORD="bit@123"
 COUNTRY="CN"
 STATE="ShanXi"
 CITY="XiAn"
 ORGANIZATION="bitejiuyeke"
 ORGANIZATIONAL_UNIT="Dev"
-EMAIL="123@139.com"
+EMAIL="m15360167286@163.com"
 
 #临时文件夹
 TEMP_DIR='/data/cert/docker'
