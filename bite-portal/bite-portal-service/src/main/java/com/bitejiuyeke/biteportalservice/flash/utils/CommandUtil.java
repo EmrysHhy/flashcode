@@ -141,8 +141,11 @@ public class CommandUtil {
     }
 
     private static void updateNginxConfig(DockerClient dockerClient, String containerName, Long appId, int port) {
+        String script = FlashcodeConstant.NGINX_UPDATE_SCRIPT;
+        // Windows 检出的脚本带 CRLF 时，bash 会把 \r 当成命令，必须先剥掉
         execInContainer(dockerClient, containerName, "更新 nginx 配置",
-                "bash", FlashcodeConstant.NGINX_UPDATE_SCRIPT, String.valueOf(appId), String.valueOf(port));
+                "bash", "-c",
+                "sed -i 's/\\r$//' " + script + " && bash " + script + " " + appId + " " + port);
         execInContainer(dockerClient, containerName, "重载 nginx", "nginx", "-s", "reload");
         log.info("nginx 配置已更新并重载, appId={}, port={}", appId, port);
     }
