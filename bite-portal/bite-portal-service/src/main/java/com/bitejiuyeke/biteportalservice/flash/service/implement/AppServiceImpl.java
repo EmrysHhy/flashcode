@@ -56,8 +56,8 @@ public class AppServiceImpl implements IAppService {
                 .content();
         log.info("生成应用代码完成，appId: {}, appCode: {}", appId, appCode);
 
-        //解析得到类型
-        AppTypesEnum appType = AnalysisUtil.getType(appCode);
+        Map<String, String> files = AnalysisUtil.getFiles(appCode);
+        AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);
         //更新数据库类型 updateType(appId, appType)
         AppDO appDO = flashCodeMapper.selectById(appId);
         if (appDO != null) {
@@ -68,7 +68,6 @@ public class AppServiceImpl implements IAppService {
         giteeService.push(appCode);
 
         //本地代码保存
-        Map<String, String> files = AnalysisUtil.getFiles(appCode);
         Path codePath = FileWriterUtil.saveCode(appId, files);
 
         // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
@@ -178,13 +177,14 @@ public class AppServiceImpl implements IAppService {
                 "  - `vite.config.js`：必须配置 `base: './'`，配置 `@` 别名指向 `./src`。",
                 "  - `router`：必须使用 `createWebHashHistory()`。",
                 "  - `package.json`：必须包含 `dev` (`vite`) 和 `build` (`vite build`) 脚本。",
+                "  - `index.html`：禁止空文件。必须是完整 Vite 入口 HTML，至少包含 `<div id=\"app\"></div>` 和 `<script type=\"module\" src=\"/src/main.js\"></script>`。",
                 "- **质量保证**：",
                 "  - 必须能够通过 `npm install` 安装项目所需依赖，并且能够通过 `npm run build` 正确完成构建生成dist目录",
                 "#### 3. SpringBoot + Vue3 工程（" + AppTypesEnum.Spring_Vue3.name() + "）",
                 "- **目录结构**：前端代码置于 `frontend/` 目录下，后端代码置于 `backend/` 目录下。",
                 "- **前端部分（frontend/）**：",
                 "  - 遵循上述 **" + AppTypesEnum.Vue3.name() + "** 的所有规范。",
-                "  - **API 请求关键**：前端请求后端接口时，URL **必须**统一添加前缀 `/api` + appId + `/api`（例如 `/api/users`）。这是网关转发规则，务必遵守。",
+                "  - **API 请求关键**：前端请求后端接口时，URL **必须**统一添加前缀 `/" + appId + "/api`（例如 `/" + appId + "/api/users`）。这是网关转发规则，务必遵守。",
                 "- **后端部分（backend/）**：",
                 "  - **技术栈**：Spring Boot 3.x、JDK 21、Maven3.9。",
                 "  - **代码规范**：务必通过java自身语法完成代码不要引入其它资源",
@@ -205,7 +205,7 @@ public class AppServiceImpl implements IAppService {
                 "<complete_file_content>",
                 "```",
                 "  - `<relative_path>`：文件的相对路径（如 `index.html`，`frontend/src/App.vue`，`backend/src/main/resources/application.properties`）。",
-                "  - `<complete_file_content>`：**完整**的文件内容，**绝对禁止**省略、使用占位符或 `// ...`。"
+                "  - `<complete_file_content>`：**完整**的文件内容，**绝对禁止**空代码块、省略、使用占位符或 `// ...`。"
         );
     }
 

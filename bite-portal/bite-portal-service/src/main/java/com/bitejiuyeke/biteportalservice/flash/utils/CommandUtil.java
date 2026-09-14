@@ -58,7 +58,7 @@ public class CommandUtil {
             int exitCode = process.exitValue();
             if (exitCode != 0) {
                 log.error("命令失败, cmd={}, code={}, out=\n{}", command, exitCode, output);
-                throw new ServiceException("命令执行失败: " + command);
+                throw new ServiceException(buildCommandFailureMessage(command, workDir, exitCode, output.toString()));
             }
             log.info("命令完成: {}", command);
         } catch (ServiceException e) {
@@ -68,8 +68,28 @@ public class CommandUtil {
             throw new ServiceException("命令执行被中断: " + command);
         } catch (Exception e) {
             log.error("命令执行异常: {}", command, e);
-            throw new ServiceException("命令执行失败: " + command);
+            throw new ServiceException("命令执行失败: " + command + "，" + e.getMessage());
         }
+    }
+
+    private static String buildCommandFailureMessage(String command, Path workDir, int exitCode, String output) {
+        return String.format(
+                "命令执行失败: %s%n工作目录: %s%n退出码: %d%n输出:%n%s",
+                command,
+                workDir.toAbsolutePath(),
+                exitCode,
+                truncateOutput(output, 2000)
+        );
+    }
+
+    private static String truncateOutput(String output, int maxLength) {
+        if (output == null || output.length() <= maxLength) {
+            return output == null ? "" : output;
+        }
+        int halfLength = maxLength / 2;
+        return output.substring(0, halfLength)
+                + "\n... (省略 " + (output.length() - maxLength) + " 字符) ...\n"
+                + output.substring(output.length() - halfLength);
     }
 
     /**

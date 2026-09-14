@@ -43,7 +43,10 @@ public class FileWriterUtil {
             if (files == null || files.isEmpty()) {
                 return appDir;
             }
-            // 创建应用根目录；已存在也不会报错
+            // 同一 appId 重新生成时，先清空旧目录，避免上次留下的启动类、node_modules 混进来
+            if (Files.exists(appDir)) {
+                deleteDirectory(appDir);
+            }
             Files.createDirectories(appDir);
 
             for (Map.Entry<String, String> entry : files.entrySet()) {
@@ -136,6 +139,26 @@ public class FileWriterUtil {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Path dest = target.resolve(source.relativize(file));
                 Files.copy(file, dest, StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+    /**
+     * 删除目录及其所有子文件和子目录。
+     * @param directory
+     * @throws IOException
+     */
+    private static void deleteDirectory(Path directory) throws IOException {
+        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.deleteIfExists(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                Files.deleteIfExists(dir);
                 return FileVisitResult.CONTINUE;
             }
         });

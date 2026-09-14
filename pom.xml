@@ -112,12 +112,6 @@
             </dependency>
 
             <dependency>
-                <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-                <version>${mybatis-plus.version}</version>
-            </dependency>
-
-            <dependency>
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
@@ -155,7 +149,7 @@
 
             <dependency>
                 <groupId>com.github.docker-java</groupId>
-                <artifactId>docker-java-transport-httpclient5</artifactId>
+                <artifactId>docker-java-transport-zerodep</artifactId>
                 <version>${docker-java.version}</version>
             </dependency>
 

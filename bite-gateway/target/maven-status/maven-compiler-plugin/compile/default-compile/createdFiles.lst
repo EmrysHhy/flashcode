@@ -1,4 +1,0 @@
-com\bitejiuyeke\bitegateway\config\IgnoreWhiteProperties.class
-com\bitejiuyeke\bitegateway\filter\AuthFilter.class
-com\bitejiuyeke\bitegateway\BiteGatewayApplication.class
-com\bitejiuyeke\bitegateway\handler\GatewayExceptionHandler.class

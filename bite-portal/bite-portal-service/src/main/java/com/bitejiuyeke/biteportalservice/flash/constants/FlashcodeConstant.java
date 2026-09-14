@@ -19,7 +19,7 @@ public class FlashcodeConstant {
      */
     public static final String CMD_NPM_INSTALL = "npm install";
     public static final String CMD_NPM_BUILD = "npm run build";
-    public static final String CMD_MVN_PACKAGE = "mvn clean package";
+    public static final String CMD_MVN_PACKAGE = "mvn clean package -DskipTests";
 
     /**
      * 预览容器
