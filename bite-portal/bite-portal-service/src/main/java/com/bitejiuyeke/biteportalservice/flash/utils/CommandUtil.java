@@ -39,6 +39,7 @@ public class CommandUtil {
                 : new ProcessBuilder("sh", "-c", command);
         processBuilder.directory(workDir.toFile());
         processBuilder.redirectErrorStream(true);
+        processBuilder.environment().put("npm_config_registry", FlashcodeConstant.NPM_REGISTRY);
         try {
             Process process = processBuilder.start();
             StringBuilder output = new StringBuilder();

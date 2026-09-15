@@ -30,3 +30,5 @@ docker logs -f flashcode-bite-portal-service-1
 docker logs flashcode-bite-portal-service-1 2>&1 | grep -E 'Started BitePortal|APPLICATION FAILED'
 # 远程部署
 clean deploy -pl bite-portal/bite-portal-service -am -DskipTests
+# Spring启动日志
+docker exec flashcode-userapp-preview tail -n 50 /workspace/user-preview/10000005/app.log

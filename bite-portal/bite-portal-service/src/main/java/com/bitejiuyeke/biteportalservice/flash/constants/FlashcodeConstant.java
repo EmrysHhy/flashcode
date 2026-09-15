@@ -17,7 +17,8 @@ public class FlashcodeConstant {
     /**
      * 运行命令
      */
-    public static final String CMD_NPM_INSTALL = "npm install";
+    public static final String NPM_REGISTRY = "https://registry.npmmirror.com";
+    public static final String CMD_NPM_INSTALL = "npm install --registry=" + NPM_REGISTRY;
     public static final String CMD_NPM_BUILD = "npm run build";
     public static final String CMD_MVN_PACKAGE = "mvn clean package -DskipTests";
 

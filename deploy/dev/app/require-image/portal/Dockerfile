@@ -31,6 +31,7 @@ RUN MAVEN_TGZ=apache-maven-${MAVEN_VERSION}-bin.tar.gz && \
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    echo "registry=https://registry.npmmirror.com" > /root/.npmrc
 
 CMD ["bash"]
