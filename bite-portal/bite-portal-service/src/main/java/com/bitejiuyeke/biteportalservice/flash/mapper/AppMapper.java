@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Update;
  * content:
  */
 @Mapper
-public interface FlashCodeMapper extends BaseMapper<AppDO> {
+public interface AppMapper extends BaseMapper<AppDO> {
     @Update("UPDATE app SET app_preview_url = #{url} WHERE id = #{appId}")
     int updateUrlById(@Param("appId") Long appId, @Param("url") String url);
 }

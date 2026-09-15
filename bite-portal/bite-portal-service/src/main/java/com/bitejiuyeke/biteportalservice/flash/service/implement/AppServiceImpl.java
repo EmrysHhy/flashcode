@@ -5,7 +5,7 @@ import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
-import com.bitejiuyeke.biteportalservice.flash.mapper.FlashCodeMapper;
+import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
@@ -14,6 +14,7 @@ import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,7 @@ public class AppServiceImpl implements IAppService {
     @Autowired
     ChatClient chatClient;
     @Autowired
-    FlashCodeMapper flashCodeMapper;
+    AppMapper appMapper;
     @Autowired
     IGiteeService giteeService;
     @Autowired
@@ -52,6 +53,7 @@ public class AppServiceImpl implements IAppService {
         String appCode = chatClient.prompt()
                 .system(getSysPrompt(appId))
                 .user(getUserPrompt(requirement))
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
                 .call()
                 .content();
         log.info("生成应用代码完成，appId: {}, appCode: {}", appId, appCode);
@@ -59,10 +61,10 @@ public class AppServiceImpl implements IAppService {
         Map<String, String> files = AnalysisUtil.getFiles(appCode);
         AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);
         //更新数据库类型 updateType(appId, appType)
-        AppDO appDO = flashCodeMapper.selectById(appId);
+        AppDO appDO = appMapper.selectById(appId);
         if (appDO != null) {
             appDO.setAppType(appType.getValue());
-            flashCodeMapper.updateById(appDO);
+            appMapper.updateById(appDO);
         }
         //上传码云 push(appCode)todo
         giteeService.push(appCode);
@@ -76,7 +78,7 @@ public class AppServiceImpl implements IAppService {
         // 3. 得到URL预览地址
         String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
         // 4. 更新数据库中的预览地址
-        int updated = flashCodeMapper.updateUrlById(appId, url);
+        int updated = appMapper.updateUrlById(appId, url);
         if(updated <= 0){
             log.error("更新预览地址失败，appId: {}, url: {}", appId, url);
             throw new ServiceException("更新预览地址失败");

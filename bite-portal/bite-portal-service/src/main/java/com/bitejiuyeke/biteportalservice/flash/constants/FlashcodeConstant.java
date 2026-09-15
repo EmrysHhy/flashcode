@@ -1,11 +1,13 @@
 package com.bitejiuyeke.biteportalservice.flash.constants;
 
+import com.bitejiuyeke.bitecommondomain.constants.CommonConstants;
+
 /**
  *
  * @author Emrys
  * content:
  */
-public class FlashcodeConstant {
+public class FlashcodeConstant extends CommonConstants {
     public static final String APP_DOC = "appDoc";
     public static final String APP_NAME = "appName";
     public static final String APP_DESC = "appDesc";
@@ -32,4 +34,9 @@ public class FlashcodeConstant {
     public static final int JAR_HOST_PORT_BASE = 8001;
     public static final int JAR_HOST_PORT_RANGE = 1999;
     public static final String USER_DEVELOP_DIR = "user-develop";
+    /**
+     * redis key
+     */
+    public static final String REDIS_CHAT_HISTORY_PRE = "chat_history_list_";  // 还需要加+appId
+
 }

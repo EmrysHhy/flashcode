@@ -196,7 +196,7 @@ public class RedisService {
 
     //*********************** 操作List类型 **************************
     //修饰符  返回值类型 函数名  参数列表  函数体
-    //缓存List数据（插入整个list数据，并保持原顺序）
+    //缓存List数据（插入整个list数据，并保持原顺序）F
     /**
      * 缓存List数据
      * @param key 缓存的键值
@@ -368,6 +368,15 @@ public class RedisService {
     public long getCacheListSize(final String key) {
         Long size = redisTemplate.opsForList().size(key);
         return size == null ? 0L : size;
+    }
+    /**
+     * 保留列表末尾 maxLen 条；不足则全部保留
+     */
+    public void trimList(final String key, final int maxLen) {
+        if (maxLen <= 0) {
+            return;
+        }
+        redisTemplate.opsForList().trim(key, -maxLen, -1);
     }
 
     //************************ 操作Set类型 ***************************
@@ -556,5 +565,8 @@ public class RedisService {
                 value);
         return !Objects.equals(result, 0L);
     }
-
+    //******************************** flashcode ***********************************
+    public <T> void add(final String key, final String hKey, final T value) {
+        redisTemplate.opsForHash().put(key, hKey, value);
+    }
 }

@@ -2,11 +2,12 @@ package com.bitejiuyeke.biteportalservice.flash.service.implement;
 
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
-import com.bitejiuyeke.biteportalservice.flash.mapper.FlashCodeMapper;
+import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
 import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +25,7 @@ public class RequirementServiceImpl implements IRequirementService {
     @Autowired
     ChatClient chatClient;
     @Autowired
-    FlashCodeMapper flashCodeMapper;
+    AppMapper appMapper;
     @Autowired
     TokenService tokenService;
 
@@ -35,13 +36,23 @@ public class RequirementServiceImpl implements IRequirementService {
      */
     @Override
     public RequirementDTO generateRequirement(String input) {
+        AppDO appDO = new AppDO();
+        appDO.setUserId(999L);
+        appDO.setAppName("待生成");
+        appDO.setAppDesc("待生成");
+        appMapper.insert(appDO);
+        String conversationId = String.valueOf(appDO.getId());
         String content = chatClient.prompt()
                 .system(getSysPrompt())
                 .user(input)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .content();
-        AppDO appDO = buildAppDO(content);
-        flashCodeMapper.insert(appDO);
+        AppDO parsed = buildAppDO(content);
+        appDO.setAppName(parsed.getAppName());
+        appDO.setAppDesc(parsed.getAppDesc());
+        appDO.setAppDoc(parsed.getAppDoc());
+        appMapper.updateById(appDO);
 
         //返回DTO
         RequirementDTO requirementDTO = new RequirementDTO();
