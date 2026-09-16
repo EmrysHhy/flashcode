@@ -18,7 +18,6 @@
         <module>bite-admin</module>
         <module>bite-common</module>
         <module>bite-gateway</module>
-        <module>bite-mstemplate</module>
         <module>bite-file</module>
         <module>bite-portal</module>
     </modules>

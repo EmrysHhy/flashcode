@@ -20,8 +20,8 @@ docker compose -f docker-compose-mid.yml up -d
 # 最近 100 行
 docker logs --tail 100 flashcode-bite-admin-service-1
 
-# portal
-docker logs --tail 100 flashcode-bite-portal-service-1
+# portal 日志
+docker logs --tail 300 flashcode-bite-portal-service-1
 
 # 持续跟踪（Ctrl+C 停）
 docker logs -f flashcode-bite-portal-service-1

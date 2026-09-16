@@ -14,7 +14,10 @@ import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +42,8 @@ public class AppServiceImpl implements IAppService {
     IGiteeService giteeService;
     @Autowired
     DockerClient dockerClient;
+    @Autowired
+    VectorStore vectorStore;
 
     /**
      * app应用生成
@@ -54,6 +59,9 @@ public class AppServiceImpl implements IAppService {
                 .system(getSysPrompt(appId))
                 .user(getUserPrompt(requirement))
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().build())
+                        .build())
                 .call()
                 .content();
         log.info("生成应用代码完成，appId: {}, appCode: {}", appId, appCode);

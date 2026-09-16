@@ -8,7 +8,13 @@ import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,6 +33,24 @@ public class FlashcodeController {
     IRequirementService flashCodeService;
     @Autowired
     IAppService appService;
+    @Autowired
+    ChatClient chatClient;
+    @Autowired
+    VectorStore vectorStore;
+
+    @GetMapping("/test")
+    public R<String> test(@RequestParam String input, @RequestParam String conversationId) {
+        String content = chatClient.prompt()
+                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().build())
+                        .build())
+                .user(input)
+                .call()
+                .content();
+        return R.ok(content);
+    }
+
     @PostMapping("/requirement/generate")
     public R<RequirementVO> RequestDocController(String input){
         log.info("收到生成需求文档请求，输入内容：{}", input);

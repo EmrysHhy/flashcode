@@ -30,15 +30,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RedisChatMemoryConfig implements ChatMemory {
     @Value("${chat.memory.max-massage:10}")
-    /**
-     * 最大历史记录
-     */
-    private static Integer maxMassage;
+    private Integer maxMassage;
     /**
      * 超时删除
      */
     @Value("${chat.memory.ttl:12}") //单位为h
-    private static Integer ttl;
+    private Integer ttl;
 
     @Autowired
     RedisService redisService;
@@ -54,7 +51,7 @@ public class RedisChatMemoryConfig implements ChatMemory {
     public void add(String conversationId, List<Message> messages) {
         Long appId = Long.parseLong(conversationId);
         String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + appId;
-        if (conversationId == null || messages == null || messages.isEmpty()) {
+        if (messages.isEmpty()) {
             log.warn("conversationId or messages is null or empty, cannot add to chat memory.");
             return;
         }
@@ -79,8 +76,7 @@ public class RedisChatMemoryConfig implements ChatMemory {
             redisService.trimList(key, maxMassage); //只保留后面几个消息
             redisService.expire(key, ttl, TimeUnit.HOURS);
         }
-        // 存储数据库
-        // 添加到Redis的逻辑
+
     }
 
     /**
@@ -100,11 +96,17 @@ public class RedisChatMemoryConfig implements ChatMemory {
         }
         //拿不到就从数据库获取
         log.info("redis缓存中没有,从数据库中获取历史消息，appId: {}", appId);
-        List<ChatHistoryDO> lastMesByAppId = chatHistoryMapper.getLastMesByAppId(appId, ttl);
-        redisChatHistories = BeanCopyUtil.copyListProperties(lastMesByAppId,RedisChatHistoryDTO::new);
+        List<ChatHistoryDO> lastMesByAppId = chatHistoryMapper.getLastMesByAppId(appId, maxMassage);
+        if (lastMesByAppId == null || lastMesByAppId.isEmpty()) {
+            return List.of();
+        }
+        redisChatHistories = BeanCopyUtil.copyListProperties(lastMesByAppId, RedisChatHistoryDTO::new);
+        if (redisChatHistories == null || redisChatHistories.isEmpty()) {
+            return List.of();
+        }
         redisService.setCacheList(key, redisChatHistories);
         redisService.trimList(key, maxMassage); //只保留后面几个消息
-        redisService.expire(key, ttl , TimeUnit.HOURS );
+        redisService.expire(key, ttl, TimeUnit.HOURS);
         return convertToMessages(redisChatHistories);
     }
 
