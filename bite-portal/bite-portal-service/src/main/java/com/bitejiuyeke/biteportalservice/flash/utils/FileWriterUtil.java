@@ -144,6 +144,34 @@ public class FileWriterUtil {
         });
     }
     /**
+     * 删除 user-code/{appId} 下的本地源码（含 npm/maven 构建产物）。
+     * 目录不存在时直接返回。不删除 user-preview，预览仍可访问。
+     */
+    public static void deleteCodeByAppId(Long appId) {
+        if (appId == null) {
+            throw new ServiceException("应用ID不能为空");
+        }
+        Path codeRoot = Paths.get(FlashcodeConstant.USER_CODE_DIR).toAbsolutePath().normalize();
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!appDir.startsWith(codeRoot) || appDir.equals(codeRoot)) {
+            throw new ServiceException("非法应用目录");
+        }
+        if (!Files.exists(appDir)) {
+            log.info("本地代码目录不存在，跳过删除, appId={}, dir={}", appId, appDir);
+            return;
+        }
+        try {
+            deleteDirectory(appDir);
+            log.info("本地代码已删除, appId={}, dir={}", appId, appDir);
+        } catch (IOException e) {
+            log.error("删除本地代码失败, appId={}, dir={}", appId, appDir, e);
+            throw new ServiceException("删除本地代码失败");
+        }
+    }
+
+    /**
      * 删除目录及其所有子文件和子目录。
      * @param directory
      * @throws IOException

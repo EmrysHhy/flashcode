@@ -19,10 +19,12 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.*;
 
 import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.CONTAINER_NAME;
 
@@ -44,6 +46,10 @@ public class AppServiceImpl implements IAppService {
     DockerClient dockerClient;
     @Autowired
     VectorStore vectorStore;
+    @Autowired
+    Executor threadPoolTaskExecutor;
+    @Value("${flashcode.delete-code-expire:12}")
+    Integer deleteCodeExpire;
 
     /**
      * app应用生成
@@ -74,12 +80,10 @@ public class AppServiceImpl implements IAppService {
             appDO.setAppType(appType.getValue());
             appMapper.updateById(appDO);
         }
-        //上传码云 push(appCode)todo
-        giteeService.push(appCode);
-
         //本地代码保存
         Path codePath = FileWriterUtil.saveCode(appId, files);
-
+        // 源码推到 Gitee flash-user-code/{appId}/，后续删本地后可再 pull
+        giteeService.push(appId, files);
         // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
@@ -91,6 +95,13 @@ public class AppServiceImpl implements IAppService {
             log.error("更新预览地址失败，appId: {}, url: {}", appId, url);
             throw new ServiceException("更新预览地址失败");
         }
+        //创建定时器,在多久以后将本地代码删除
+        // 单独一个调度器（1～2 个线程就够）
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.schedule(
+                () -> threadPoolTaskExecutor.execute(() -> FileWriterUtil.deleteCodeByAppId(appId)),
+                deleteCodeExpire, TimeUnit.HOURS
+        );
 
 
         //返回DTO
@@ -160,6 +171,9 @@ public class AppServiceImpl implements IAppService {
                 "【输出要求】请严格按照系统提示的格式输出，不要添加多余解释。 "
         );
     }
+
+
+
 
     /**
      * 系统提示词

@@ -20,6 +20,7 @@
         <module>bite-gateway</module>
         <module>bite-file</module>
         <module>bite-portal</module>
+        <module>gitee-mcp-server</module>
     </modules>
 
     <properties>
@@ -59,6 +60,7 @@
         <dockerregistry.password>admin@666777</dockerregistry.password>
         <dockerregistry.namespace>flashcode</dockerregistry.namespace>
         <docker.skip.push>true</docker.skip.push>
+
     </properties>
 
     <dependencyManagement>

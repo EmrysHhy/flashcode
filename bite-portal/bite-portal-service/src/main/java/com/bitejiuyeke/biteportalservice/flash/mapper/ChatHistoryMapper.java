@@ -32,6 +32,10 @@ public interface ChatHistoryMapper extends BaseMapper<ChatHistoryDO> {
             """)
     List<ChatHistoryDO> getLastMesByAppId(Long appId, int size);
 
+    /**
+     * 删除当前会话
+     * @param appId
+     */
     @Update("UPDATE chat_history SET is_deleted = 1 WHERE app_id = #{appId}")
     void deleteByAppId(Long appId);
 }

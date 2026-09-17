@@ -9,13 +9,7 @@ docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-
 docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml up -d
 
 
-docker compose -f docker-compose-mid.yml restart
-
-
-
-docker compose -f docker-compose-mid.yml down
-docker compose -f docker-compose-mid.yml up -d
-
+docker compose -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml restart -d
 
 # 最近 100 行
 docker logs --tail 100 flashcode-bite-admin-service-1
@@ -32,3 +26,6 @@ docker logs flashcode-bite-portal-service-1 2>&1 | grep -E 'Started BitePortal|A
 clean deploy -pl bite-portal/bite-portal-service -am -DskipTests
 # Spring启动日志
 docker exec flashcode-userapp-preview tail -n 50 /workspace/user-preview/10000005/app.log
+
+
+Gitee私人令牌:9cf1b2893c9c24dd197b96195f419aad
