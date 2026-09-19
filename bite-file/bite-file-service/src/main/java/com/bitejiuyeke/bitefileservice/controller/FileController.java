@@ -1,39 +1,29 @@
 package com.bitejiuyeke.bitefileservice.controller;
 
-import com.bitejiuyeke.bitecommoncore.utils.BeanCopyUtil;
 import com.bitejiuyeke.bitecommondomain.domain.R;
-import com.bitejiuyeke.bitefileservice.domain.dto.FileDTO;
-import com.bitejiuyeke.bitefileservice.domain.dto.SignDTO;
-import com.bitejiuyeke.bitefileservice.domain.vo.FileVO;
-import com.bitejiuyeke.bitefileservice.domain.vo.SignVO;
+import com.bitejiuyeke.bitefileapi.file.domain.vo.FileVO;
+import com.bitejiuyeke.bitefileapi.file.domain.vo.SignVO;
+import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
 import com.bitejiuyeke.bitefileservice.service.IFileService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @Slf4j
-public class FileController {
+public class FileController implements FileFeignClient {
 
     @Autowired
     private IFileService fileService;
 
-    @PostMapping("/upload")
+    @Override
     public R<FileVO> upload(MultipartFile file) {
-        FileDTO fileDTO = fileService.upload(file);
-        FileVO fileVO = new FileVO();
-        BeanCopyUtil.copyProperties(fileDTO, fileVO);
-        return R.ok(fileVO);
+        return R.ok(fileService.upload(file));
     }
 
-    @GetMapping("/sign")
+    @Override
     public R<SignVO> getSign() {
-        SignDTO signDTO = fileService.getSign();
-        SignVO signVO = new SignVO();
-        BeanCopyUtil.copyProperties(signDTO, signVO);
-        return R.ok(signVO);
+        return R.ok(fileService.getSign());
     }
 }

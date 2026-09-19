@@ -1,11 +1,14 @@
-package com.bitejiuyeke.bitefileservice.domain.dto;
+package com.bitejiuyeke.bitefileapi.file.domain.vo;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
-@Getter
-@Setter
-public class SignDTO {
+import java.io.Serializable;
+
+/**
+ * OSS 直传签名
+ */
+@Data
+public class SignVO implements Serializable {
 
     /**
      * 签名
