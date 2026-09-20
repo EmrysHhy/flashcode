@@ -79,7 +79,7 @@ public class CommandUtil {
                 command,
                 workDir.toAbsolutePath(),
                 exitCode,
-                truncateOutput(output, 2000)
+                truncateOutput(output, 8000)
         );
     }
 
@@ -87,10 +87,9 @@ public class CommandUtil {
         if (output == null || output.length() <= maxLength) {
             return output == null ? "" : output;
         }
-        int halfLength = maxLength / 2;
-        return output.substring(0, halfLength)
-                + "\n... (省略 " + (output.length() - maxLength) + " 字符) ...\n"
-                + output.substring(output.length() - halfLength);
+        // 编译错误多在末尾
+        return "... (省略前 " + (output.length() - maxLength) + " 字符) ...\n"
+                + output.substring(output.length() - maxLength);
     }
 
     /**

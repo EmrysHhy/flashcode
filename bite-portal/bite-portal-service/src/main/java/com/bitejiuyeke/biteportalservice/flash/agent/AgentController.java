@@ -2,48 +2,38 @@ package com.bitejiuyeke.biteportalservice.flash.agent;
 
 import com.bitejiuyeke.bitecommondomain.domain.R;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
-import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
-import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
-import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  *
  * @author Emrys
  * content:
  */
-@RequestMapping("/agent/flashcode")
+@RequestMapping("/flashcode/agent")
 @RestController
+@Validated
 @Slf4j
 public class AgentController {
+
     @Autowired
-    IRequirementService flashCodeService;
-    @Autowired
-    IAppService appService;
-    @Autowired
-    ChatClient chatClient;
-    @Autowired
-    VectorStore vectorStore;
+    MultiAgentWorkFlow multiAgentWorkFlow;
 
     @PostMapping("/app/generate")
-    public R<GenerateAppVO> appGenerate(@RequestParam Long appId, @RequestParam String requirement){
-        log.info("收到生成应用请求\nappId：{}\n需求文档：{}", appId, requirement);
-        GenerateAppDTO generateAppDTO = appService.appGenerate(appId,requirement);
+    public R<GenerateAppVO> appGenerate(@RequestParam @NotNull(message = "应用ID不能为空") Long appId,
+                                        @RequestParam @NotBlank(message = "需求文档不能为空") String requirement,
+                                        @RequestParam MultipartFile reference) {
+        log.info("appGenerate: appId={}, requirement={}, reference={}", appId, requirement, reference != null ? reference.getOriginalFilename() : "null");
+            GenerateAppDTO generateAppDTO = multiAgentWorkFlow.generate(appId, requirement,reference);
         return R.ok(generateAppDTO.convertToVO());
     }
-
-
 }

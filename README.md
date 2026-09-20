@@ -7,6 +7,8 @@ docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-
 
 
 docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml up -d
+docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml down
+
 
 
 docker compose -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml restart -d

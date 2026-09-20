@@ -19,6 +19,7 @@ public class FlashcodeConstant extends CommonConstants {
      */
     public static final String REQUIREMENT = "requirement";
     public static final String APP_ID = "appId";
+    public static final String REFERENCE_PATH = "referencePath";
     public static final String FILES = "files";
     public static final String APP_IS_GENERATE = "appIsGenerate";
     public static final String APP_IS_BUILD = "appIsBuild";
@@ -28,6 +29,15 @@ public class FlashcodeConstant extends CommonConstants {
     public static final String CODE_PATH = "codePath";
     public static final String APP_TYPE = "appType";
     public static final String ERROR_TYPE = "errorType";
+    /** 是否属于改代码可修（npm/mvn/copy）；Docker、改库等为 false */
+    public static final String ERROR_FIXABLE = "errorFixable";
+    public static final String STAGE_NPM_INSTALL = "npm_install";
+    public static final String STAGE_NPM_BUILD = "npm_build";
+    public static final String STAGE_MVN_PACKAGE = "mvn_package";
+    public static final String STAGE_COPY_PREVIEW = "copy_preview";
+    public static final String STAGE_START_JAR = "start_jar";
+    public static final String STAGE_UPDATE_URL = "update_url";
+    public static final String STAGE_UNKNOWN = "unknown";
     public static final String GENERATE_ERROR_MESSAGE = "generateErrorMessage";
     public static final String PHOTO_PATH = "photoPath";
     public static final String BUILD_ERROR_MESSAGE = "buildErrorMessage";

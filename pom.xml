@@ -20,7 +20,6 @@
         <module>bite-gateway</module>
         <module>bite-file</module>
         <module>bite-portal</module>
-        <module>gitee-mcp-server</module>
     </modules>
 
     <properties>

@@ -46,7 +46,7 @@ public class AppScreenshotNode implements NodeAction {
 
             Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
             String url = state.value(FlashcodeConstant.PREVIEW_URL, String.class).orElse(null);
-            Path photoPath = SeleniumUtil.screenshot(url);
+            Path photoPath = SeleniumUtil.screenshot(appId,url);
             if (photoPath == null || !Files.exists(photoPath)) {
                 throw new ServiceException("截图失败");
             }
@@ -58,7 +58,10 @@ public class AppScreenshotNode implements NodeAction {
             }
             String onlinePhoto = upload.getData().getUrl();
             //存入数据库
-            appMapper.updateUrlById(appId, onlinePhoto);
+            int updated = appMapper.updateScreenshotById(appId, onlinePhoto);
+            if (updated <= 0) {
+                throw new ServiceException("更新截图地址失败");
+            }
 
             Map<String, Object> result = new HashMap<>();
             result.put("onlinePhoto", onlinePhoto);

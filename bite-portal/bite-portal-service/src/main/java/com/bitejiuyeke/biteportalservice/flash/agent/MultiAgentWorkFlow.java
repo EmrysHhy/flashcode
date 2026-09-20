@@ -1,9 +1,14 @@
 package com.bitejiuyeke.biteportalservice.flash.agent;
 
+import com.alibaba.cloud.ai.graph.CompiledGraph;
+import com.alibaba.cloud.ai.graph.KeyStrategy;
+import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
+import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.AppGenerationAgent;
@@ -12,15 +17,21 @@ import com.bitejiuyeke.biteportalservice.flash.agent.node.BuildPreviewNode;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.CommitNode;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.ErrorFixAgent;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
+import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileWriter;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
@@ -68,6 +79,7 @@ public class MultiAgentWorkFlow {
     private final FileFeignClient fileFeignClient;
     private final DockerClient dockerClient;
     private final StateGraph stateGraph;
+    private final CompiledGraph compiledGraph;
     private final Integer deleteCodeExpire;
     private final ScheduledExecutorService scheduledExecutorService;
 
@@ -84,8 +96,6 @@ public class MultiAgentWorkFlow {
                               IGiteeService giteeService,
                               FileFeignClient fileFeignClient,
                               DockerClient dockerClient,
-                              Executor threadPoolTaskExecutor,
-                              StateGraph stateGraph,
                               Integer deleteCodeExpire,
                               ScheduledExecutorService scheduledExecutorService) {
         this.chatClient = chatClient;
@@ -94,11 +104,93 @@ public class MultiAgentWorkFlow {
         this.giteeService = giteeService;
         this.fileFeignClient = fileFeignClient;
         this.dockerClient = dockerClient;
-        this.stateGraph = stateGraph;
         this.deleteCodeExpire = deleteCodeExpire;
         this.scheduledExecutorService = scheduledExecutorService;
+        this.stateGraph = new StateGraph(keyStrategyFactory());
         addNode();
         addEdge();
+        try {
+            this.compiledGraph = stateGraph.compile();
+        } catch (GraphStateException e) {
+            log.error("编译工作流失败", e);
+            throw new ServiceException("编译工作流失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 单次请求一份新 Map；图已在启动时 compile，这里只 invoke。
+     */
+    public GenerateAppDTO generate(Long appId, String requirement, MultipartFile reference) {
+        if (appId == null || requirement == null || requirement.isBlank()) {
+            throw new ServiceException("appId 和需求文档不能为空");
+        }
+        Map<String, Object> input = new HashMap<>();
+        input.put(FlashcodeConstant.APP_ID, appId);
+        input.put(FlashcodeConstant.REQUIREMENT, requirement);
+        input.put(FlashcodeConstant.GENERATE_ATTEMPT, 0);
+        input.put(FlashcodeConstant.SCREENSHOT_ATTEMPT, 0);
+        input.put(FlashcodeConstant.COMMIT_ATTEMPT, 0);
+        if (reference != null) {
+            log.info("参考文件：{}，大小：{} 字节", reference.getOriginalFilename(), reference.getSize());
+            // 存入本地暂存
+            Path path = FileWriterUtil.writeReferenceFile(appId, reference);
+            String pathStr = path.toAbsolutePath().toString();
+            input.put(FlashcodeConstant.REFERENCE_PATH, pathStr);
+
+        }
+
+        RunnableConfig config = RunnableConfig.builder()
+                .threadId(String.valueOf(appId))
+                .build();
+        OverAllState state = compiledGraph.invoke(input, config)
+                .orElseThrow(() -> new ServiceException("工作流未返回状态"));
+
+        if (!state.value(FlashcodeConstant.APP_IS_COMMIT, Boolean.class).orElse(false)) {
+            String error = state.value(FlashcodeConstant.COMMIT_ERROR_MESSAGE, String.class)
+                    .orElseGet(() -> state.value(FlashcodeConstant.SCREENSHOT_ERROR_MESSAGE, String.class)
+                            .orElseGet(() -> state.value(FlashcodeConstant.FIX_ERROR_MESSAGE, String.class)
+                                    .orElseGet(() -> state.value(FlashcodeConstant.BUILD_ERROR_MESSAGE, String.class)
+                                            .orElseGet(() -> state.value(FlashcodeConstant.GENERATE_ERROR_MESSAGE, String.class)
+                                                    .orElse("应用生成失败")))));
+            throw new ServiceException(error);
+        }
+
+        GenerateAppDTO dto = new GenerateAppDTO();
+        dto.setAppId(appId);
+        dto.setAppType(AppTypesEnum.of(state.value(FlashcodeConstant.APP_TYPE, String.class).orElse(null)));
+        dto.setUrl(state.value(FlashcodeConstant.PREVIEW_URL, String.class).orElse(null));
+        return dto;
+    }
+
+    /** 节点回写的字段一律覆盖，不要 Append */
+    private static KeyStrategyFactory keyStrategyFactory() {
+        return () -> {
+            HashMap<String, KeyStrategy> strategies = new HashMap<>();
+            ReplaceStrategy replace = new ReplaceStrategy();
+            strategies.put(FlashcodeConstant.APP_ID, replace);
+            strategies.put(FlashcodeConstant.REQUIREMENT, replace);
+            strategies.put(FlashcodeConstant.FILES, replace);
+            strategies.put(FlashcodeConstant.APP_IS_GENERATE, replace);
+            strategies.put(FlashcodeConstant.APP_IS_BUILD, replace);
+            strategies.put(FlashcodeConstant.APP_IS_FIX, replace);
+            strategies.put(FlashcodeConstant.APP_IS_SCREENSHOT, replace);
+            strategies.put(FlashcodeConstant.APP_IS_COMMIT, replace);
+            strategies.put(FlashcodeConstant.CODE_PATH, replace);
+            strategies.put(FlashcodeConstant.APP_TYPE, replace);
+            strategies.put(FlashcodeConstant.ERROR_TYPE, replace);
+            strategies.put(FlashcodeConstant.GENERATE_ERROR_MESSAGE, replace);
+            strategies.put(FlashcodeConstant.PHOTO_PATH, replace);
+            strategies.put(FlashcodeConstant.BUILD_ERROR_MESSAGE, replace);
+            strategies.put(FlashcodeConstant.FIX_ERROR_MESSAGE, replace);
+            strategies.put(FlashcodeConstant.SCREENSHOT_ERROR_MESSAGE, replace);
+            strategies.put(FlashcodeConstant.COMMIT_ERROR_MESSAGE, replace);
+            strategies.put(FlashcodeConstant.GENERATE_ATTEMPT, replace);
+            strategies.put(FlashcodeConstant.SCREENSHOT_ATTEMPT, replace);
+            strategies.put(FlashcodeConstant.COMMIT_ATTEMPT, replace);
+            strategies.put(FlashcodeConstant.PREVIEW_URL, replace);
+            strategies.put(FlashcodeConstant.ERROR_FIXABLE, replace);
+            return strategies;
+        };
     }
 
     /**
@@ -122,7 +214,8 @@ public class MultiAgentWorkFlow {
                     edge_async(this::routeAfterPreview),
                     Map.of(
                             ROUTE_SCREENSHOT, ID_APP_SCREENSHOT_NODE,
-                            ROUTE_FIX, ID_ERROR_FIX_AGENT
+                            ROUTE_FIX, ID_ERROR_FIX_AGENT,
+                            ROUTE_END, StateGraph.END
                     ));
 
             // fix：成功回预览；失败且整次流程 gen 次数未满则重新生成；否则结束
@@ -168,10 +261,13 @@ public class MultiAgentWorkFlow {
         return ROUTE_END;
     }
 
-    /** 依据 {@link FlashcodeConstant#APP_IS_BUILD} */
+    /** 构建成功去截图；改代码可修则 fix；Docker/改库等环境问题直接结束 */
     private String routeAfterPreview(OverAllState state) {
         if (state.value(FlashcodeConstant.APP_IS_BUILD, Boolean.class).orElse(false)) {
             return ROUTE_SCREENSHOT;
+        }
+        if (!state.value(FlashcodeConstant.ERROR_FIXABLE, Boolean.class).orElse(true)) {
+            return ROUTE_END;
         }
         return ROUTE_FIX;
     }
@@ -216,11 +312,11 @@ public class MultiAgentWorkFlow {
     private void addNode() {
         try {
             stateGraph.addNode(ID_APP_GENERATION_AGENT,
-                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, giteeService)));
+                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore)));
             stateGraph.addNode(ID_BUILD_PREVIEW_NODE,
                     AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper)));
             stateGraph.addNode(ID_ERROR_FIX_AGENT,
-                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, vectorStore, giteeService)));
+                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, vectorStore )));
             stateGraph.addNode(ID_APP_SCREENSHOT_NODE,
                     AsyncNodeAction.node_async(new AppScreenshotNode(appMapper, fileFeignClient)));
             stateGraph.addNode(ID_COMMIT_NODE,

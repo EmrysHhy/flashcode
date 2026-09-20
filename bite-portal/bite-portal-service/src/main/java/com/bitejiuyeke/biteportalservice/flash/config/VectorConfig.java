@@ -21,7 +21,7 @@ import java.util.Map;
 
 @Configuration
 @Slf4j
-public class VectorDataInit implements ApplicationRunner {
+public class VectorConfig implements ApplicationRunner {
 
     private static final int EMBEDDING_BATCH_SIZE = 10;
 

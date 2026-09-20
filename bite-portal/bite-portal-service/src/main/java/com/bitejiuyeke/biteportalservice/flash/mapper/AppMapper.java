@@ -2,7 +2,6 @@ package com.bitejiuyeke.biteportalservice.flash.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
-import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
@@ -16,6 +15,10 @@ import org.apache.ibatis.annotations.Update;
 public interface AppMapper extends BaseMapper<AppDO> {
     @Update("UPDATE app SET app_preview_url = #{url} WHERE id = #{appId}")
     int updateUrlById(@Param("appId") Long appId, @Param("url") String url);
+
+    @Update("UPDATE app SET app_screenshot = #{url} WHERE id = #{appId}")
+    int updateScreenshotById(@Param("appId") Long appId, @Param("url") String url);
+
     @Update("UPDATE app SET app_type = #{appType} WHERE id = #{appId}")
-    void updateTypeById(Long appId, AppTypesEnum appType);
+    void updateTypeById(@Param("appId") Long appId, @Param("appType") Integer appType);
 }

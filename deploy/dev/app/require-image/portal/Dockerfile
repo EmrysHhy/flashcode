@@ -1,4 +1,4 @@
-FROM openjdk:21-jdk-slim-jdk-slim
+FROM openjdk:21-jdk-slim
 
 LABEL maintainer="bitejiuyeke"
 
@@ -6,14 +6,39 @@ ENV TZ=Asia/Shanghai
 ENV MAVEN_VERSION=3.9.16
 ENV MAVEN_HOME=/opt/maven
 ENV PATH=$MAVEN_HOME/bin:$PATH
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CHROME_BIN=/usr/bin/google-chrome
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# ---------- 1. 一次性安装所有系统依赖 ----------
+# ---------- 1. 系统工具 + 无头 Chrome（给 Selenium 截图） ----------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        wget && \
+        wget \
+        gnupg \
+        ca-certificates \
+        fonts-liberation \
+        fonts-noto-cjk \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libcups2 \
+        libdrm2 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxkbcommon0 \
+        libxrandr2 \
+        xdg-utils && \
+    wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb && \
+    apt-get install -y --no-install-recommends /tmp/chrome.deb && \
+    rm -f /tmp/chrome.deb && \
+    ln -sf /usr/bin/google-chrome-stable /usr/bin/google-chrome && \
     rm -rf /var/lib/apt/lists/*
 
 # ---------- 2. 安装 Maven (稳定缓存层) ----------

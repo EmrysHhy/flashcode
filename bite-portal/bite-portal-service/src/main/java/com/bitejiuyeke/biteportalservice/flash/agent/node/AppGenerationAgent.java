@@ -5,7 +5,6 @@ import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
-import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -29,24 +28,24 @@ public class AppGenerationAgent implements NodeAction {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AppMapper appMapper;
-    private final IGiteeService giteeService;
 
     public AppGenerationAgent(ChatClient chatClient,
                               AppMapper appMapper,
-                              VectorStore vectorStore,
-                              IGiteeService giteeService) {
+                              VectorStore vectorStore) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
-        this.giteeService = giteeService;
     }
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         int generateAttempt = state.value(FlashcodeConstant.GENERATE_ATTEMPT, Integer.class).orElse(0) + 1;
         try{
-            Long appId = state.value(FlashcodeConstant.APP_ID,Long.class).orElse(null);
-            String requirement = String.valueOf(state.value(FlashcodeConstant.REQUIREMENT, String.class));
+            Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
+            String requirement = state.value(FlashcodeConstant.REQUIREMENT, String.class).orElse(null);
+            if (appId == null || requirement == null || requirement.isBlank()) {
+                throw new IllegalArgumentException("appId 或需求文档为空");
+            }
             //生成代码
             String appCode = chatClient.prompt()
                     .system(getSysPrompt(appId))
@@ -62,7 +61,7 @@ public class AppGenerationAgent implements NodeAction {
             Map<String, String> files = AnalysisUtil.getFiles(appCode);
             AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);
             //更新数据库类型 updateType(appId, appType)
-            appMapper.updateTypeById(appId, appType);
+            appMapper.updateTypeById(appId, appType.getValue());
             //本地代码保存
             Path codePath = FileWriterUtil.saveCode(appId, files);
 
