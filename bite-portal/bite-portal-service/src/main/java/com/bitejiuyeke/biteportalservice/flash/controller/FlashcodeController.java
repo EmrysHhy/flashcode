@@ -7,6 +7,7 @@ import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
+import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -40,14 +41,12 @@ public class FlashcodeController {
 
     @GetMapping("/test")
     public R<String> test(@RequestParam String input, @RequestParam String conversationId) {
-        String content = chatClient.prompt()
+        String content = ChatContentSupport.collect(chatClient.prompt()
                 .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build())
-                .user(input)
-                .call()
-                .content();
+                .user(input));
         return R.ok(content);
     }
 

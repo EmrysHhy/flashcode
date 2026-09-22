@@ -27,6 +27,9 @@ public class MultiAgentConfig {
     @Value("${flashcode.delete-code-expire:12}")
     private Integer deleteCodeExpire;
 
+    @Value("${flashcode.vision.model:qwen3-vl-plus}")
+    private String visionModel;
+
     /**
      * 启动时组图并 compile，之后各请求复用同一份 CompiledGraph。
      */
@@ -45,6 +48,7 @@ public class MultiAgentConfig {
                 fileFeignClient,
                 dockerClient,
                 deleteCodeExpire,
+                visionModel,
                 scheduledExecutorService);
     }
 

@@ -42,6 +42,7 @@ public class ChatClientConfig {
                         DashScopeChatOptions.builder()
                                 .topP(0.7)
                                 .enableThinking(true)
+                                .incrementalOutput(true)
                                 .build()
                 )
                 .build();

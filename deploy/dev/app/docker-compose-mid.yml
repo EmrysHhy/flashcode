@@ -153,6 +153,9 @@ services:
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
+      # VirtualBox 上默认 100ms heartbeat 容易误判节点掉线
+      - ETCD_HEARTBEAT_INTERVAL=500
+      - ETCD_ELECTION_TIMEOUT=5000
     volumes:
       - ../data/flashcodedata/milvus/etcd:/etcd
     command: etcd -advertise-client-urls=http://flashcode-milvus-etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
@@ -189,7 +192,7 @@ services:
 
   flashcode-milvus-standalone:
     container_name: flashcode-milvus-standalone
-    image: milvusdb/milvus:v3.0.1
+    image: milvusdb/milvus:v2.6.4
     user: root
     command: ["milvus", "run", "standalone"]
     security_opt:
@@ -199,6 +202,10 @@ services:
       MINIO_REGION: us-east-1
       ETCD_ENDPOINTS: flashcode-milvus-etcd:2379
       MINIO_ADDRESS: flashcode-milvus-minio:9000
+      # 2.6 standalone 默认仍带 streaming；lease 一丢就整容器退出。
+      # rocksmq 走本地 WAL，这台 8G 虚拟机上稳得多。
+      MQ_TYPE: rocksmq
+      COMMON_SESSION_TTL: 300
     volumes:
       - ../data/flashcodedata/milvus/data:/var/lib/milvus
     healthcheck:

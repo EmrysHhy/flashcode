@@ -16,6 +16,6 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 public class BitePortalServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(BitePortalServiceApplication.class, args);
-        log.info("门户服务启动成功");
+        log.info("flashcode-service启动成功");
     }
 }

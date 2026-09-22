@@ -49,7 +49,11 @@ public class RedisChatMemoryConfig implements ChatMemory {
 
     @Override
     public void add(String conversationId, List<Message> messages) {
-        Long appId = Long.parseLong(conversationId);
+        Long appId = parseAppId(conversationId);
+        if (appId == null) {
+            log.warn("conversationId 不是 appId，跳过写入聊天记忆: {}", conversationId);
+            return;
+        }
         String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + appId;
         if (messages.isEmpty()) {
             log.warn("conversationId or messages is null or empty, cannot add to chat memory.");
@@ -86,7 +90,10 @@ public class RedisChatMemoryConfig implements ChatMemory {
      */
     @Override
     public List<Message> get(String conversationId) {
-        long appId = Long.parseLong(conversationId);
+        Long appId = parseAppId(conversationId);
+        if (appId == null) {
+            return List.of();
+        }
         String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + appId;
         // 先从redis中获取
         List<RedisChatHistoryDTO> redisChatHistories = redisService.getCacheListByRange(key, 0, maxMassage-1, RedisChatHistoryDTO.class);
@@ -114,12 +121,29 @@ public class RedisChatMemoryConfig implements ChatMemory {
 
     @Override
     public void clear(String conversationId) {
-        Long appId = Long.parseLong(conversationId);
+        Long appId = parseAppId(conversationId);
+        if (appId == null) {
+            return;
+        }
         //1.清除redis数据
-        String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + conversationId;
+        String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + appId;
         redisService.deleteObject(key);
         //3.是否清除数据库数据? 还是说用 字段 标记可用或者不可用? 我认为应该采用标记的方式
         chatHistoryMapper.deleteByAppId(appId);
+    }
+
+    /**
+     * 会话 ID 必须是 appId。Spring AI 未传参时会用 "default"，不能 parseLong。
+     */
+    private static Long parseAppId(String conversationId) {
+        if (conversationId == null || conversationId.isBlank() || "default".equals(conversationId)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(conversationId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 

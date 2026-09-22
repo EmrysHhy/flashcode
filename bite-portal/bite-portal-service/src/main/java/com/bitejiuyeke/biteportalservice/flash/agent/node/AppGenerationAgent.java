@@ -2,11 +2,14 @@ package com.bitejiuyeke.biteportalservice.flash.agent.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
+import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
+import com.bitejiuyeke.biteportalservice.flash.utils.VisionChatSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -28,13 +31,16 @@ public class AppGenerationAgent implements NodeAction {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AppMapper appMapper;
+    private final String visionModel;
 
     public AppGenerationAgent(ChatClient chatClient,
                               AppMapper appMapper,
-                              VectorStore vectorStore) {
+                              VectorStore vectorStore,
+                              String visionModel) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
+        this.visionModel = visionModel;
     }
 
     @Override
@@ -46,22 +52,18 @@ public class AppGenerationAgent implements NodeAction {
             if (appId == null || requirement == null || requirement.isBlank()) {
                 throw new IllegalArgumentException("appId 或需求文档为空");
             }
-            //生成代码
-            String appCode = chatClient.prompt()
-                    .system(getSysPrompt(appId))
-                    .user(getUserPrompt(requirement))
-                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
-                    .advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                            .searchRequest(SearchRequest.builder().build())
-                            .build())
-                    .call()
-                    .content();
-            log.info("生成应用代码完成，appId: {}, appCode: {}", appId, appCode);
+            Path image = VisionChatSupport.resolveImage(
+                    state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
+            String appCode = generateCode(appId, requirement, image);
+            log.info("\n生成应用代码完成，appId: {}, appCode: {}\n", appId, appCode);
 
             Map<String, String> files = AnalysisUtil.getFiles(appCode);
             AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);
             //更新数据库类型 updateType(appId, appType)
-            appMapper.updateTypeById(appId, appType.getValue());
+            int updated = appMapper.updateTypeById(appId, appType.getValue());
+            if (updated <= 0) {
+                throw new ServiceException("更新应用类型失败，app 不存在, appId=" + appId + ", appType=" + appType.getValue());
+            }
             //本地代码保存
             Path codePath = FileWriterUtil.saveCode(appId, files);
 
@@ -84,17 +86,40 @@ public class AppGenerationAgent implements NodeAction {
         }
 
     }
+
+    private String generateCode(Long appId, String requirement, Path image) {
+        var spec = chatClient.prompt()
+                .system(getSysPrompt(appId))
+                .user(u -> {
+                    u.text(getUserPrompt(requirement, image != null));
+                    VisionChatSupport.attachImage(u, image);
+                })
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().build())
+                        .build());
+        if (image != null) {
+            log.info("带参考图生成，切换视觉模型 {}, appId={}", visionModel, appId);
+            spec = spec.options(VisionChatSupport.vlOptions(visionModel));
+        }
+        return ChatContentSupport.collect(spec);
+    }
+
     /**
      * 进一步封装用户提示词
      * @param requirement 用户需求
      * @return 封装后的用户提示词
      */
-    private String getUserPrompt(String requirement) {
-        return String.join("\n",
+    private String getUserPrompt(String requirement, boolean hasImage) {
+        String prompt = String.join("\n",
                 "【用户需求文档】 ",
                 requirement,
                 "【输出要求】请严格按照系统提示的格式输出，不要添加多余解释。 "
         );
+        if (hasImage) {
+            prompt += "\n【参考图】请根据用户上传的参考图还原布局、配色与主要模块；与需求文档冲突时以需求文档为准。\n";
+        }
+        return prompt;
     }
     /**
      * 系统提示词
@@ -119,9 +144,9 @@ public class AppGenerationAgent implements NodeAction {
                 "- **技术栈**：Vue 3 (Composition API，`<script setup>`)，Vite，Vue Router 4.x。",
                 "- **文件结构**：必须包含标准工程结构（`package.json`，`vite.config.js`，`index.html`，`src/main.js`，`src/App.vue` 等）。",
                 "- **配置强制要求**：",
-                "  - `vite.config.js`：必须配置 `base: './'`，配置 `@` 别名指向 `./src`。",
+                "  - `vite.config.js`：必须配置 `base: './'`，配置 `@` 别名指向 `./src`。若用 `path.resolve`，必须先 `import path from 'node:path'` 或 `const path = require('path')`，禁止直接使用未定义的 `path`。",
                 "  - `router`：必须使用 `createWebHashHistory()`。",
-                "  - `package.json`：必须包含 `dev` (`vite`) 和 `build` (`vite build`) 脚本。",
+                "  - `package.json`：必须包含 `dev` (`vite`) 和 `build` (`vite build`) 脚本。依赖写死版本、禁止 `^`：vue `3.3.11`，vue-router `4.2.5`，vite `4.5.2`，@vitejs/plugin-vue `4.5.2`。",
                 "  - `index.html`：禁止空文件。必须是完整 Vite 入口 HTML，至少包含 `<div id=\"app\"></div>` 和 `<script type=\"module\" src=\"/src/main.js\"></script>`。",
                 "- **质量保证**：",
                 "  - 必须能够通过 `npm install` 安装项目所需依赖，并且能够通过 `npm run build` 正确完成构建生成dist目录",

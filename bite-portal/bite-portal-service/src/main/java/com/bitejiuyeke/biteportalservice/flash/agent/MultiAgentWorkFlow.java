@@ -28,7 +28,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.FileWriter;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,6 +80,7 @@ public class MultiAgentWorkFlow {
     private final StateGraph stateGraph;
     private final CompiledGraph compiledGraph;
     private final Integer deleteCodeExpire;
+    private final String visionModel;
     private final ScheduledExecutorService scheduledExecutorService;
 
     /** 图中注册的节点 id，与 addNode / addConditionalEdges 映射目标一致 */
@@ -97,6 +97,7 @@ public class MultiAgentWorkFlow {
                               FileFeignClient fileFeignClient,
                               DockerClient dockerClient,
                               Integer deleteCodeExpire,
+                              String visionModel,
                               ScheduledExecutorService scheduledExecutorService) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
@@ -105,6 +106,7 @@ public class MultiAgentWorkFlow {
         this.fileFeignClient = fileFeignClient;
         this.dockerClient = dockerClient;
         this.deleteCodeExpire = deleteCodeExpire;
+        this.visionModel = visionModel;
         this.scheduledExecutorService = scheduledExecutorService;
         this.stateGraph = new StateGraph(keyStrategyFactory());
         addNode();
@@ -124,19 +126,17 @@ public class MultiAgentWorkFlow {
         if (appId == null || requirement == null || requirement.isBlank()) {
             throw new ServiceException("appId 和需求文档不能为空");
         }
+        appMapper.insertIfAbsent(appId);
         Map<String, Object> input = new HashMap<>();
         input.put(FlashcodeConstant.APP_ID, appId);
         input.put(FlashcodeConstant.REQUIREMENT, requirement);
         input.put(FlashcodeConstant.GENERATE_ATTEMPT, 0);
         input.put(FlashcodeConstant.SCREENSHOT_ATTEMPT, 0);
         input.put(FlashcodeConstant.COMMIT_ATTEMPT, 0);
-        if (reference != null) {
+        if (reference != null && !reference.isEmpty()) {
             log.info("参考文件：{}，大小：{} 字节", reference.getOriginalFilename(), reference.getSize());
-            // 存入本地暂存
             Path path = FileWriterUtil.writeReferenceFile(appId, reference);
-            String pathStr = path.toAbsolutePath().toString();
-            input.put(FlashcodeConstant.REFERENCE_PATH, pathStr);
-
+            input.put(FlashcodeConstant.REFERENCE_PATH, path.toAbsolutePath().toString());
         }
 
         RunnableConfig config = RunnableConfig.builder()
@@ -189,6 +189,7 @@ public class MultiAgentWorkFlow {
             strategies.put(FlashcodeConstant.COMMIT_ATTEMPT, replace);
             strategies.put(FlashcodeConstant.PREVIEW_URL, replace);
             strategies.put(FlashcodeConstant.ERROR_FIXABLE, replace);
+            strategies.put(FlashcodeConstant.REFERENCE_PATH, replace);
             return strategies;
         };
     }
@@ -312,11 +313,11 @@ public class MultiAgentWorkFlow {
     private void addNode() {
         try {
             stateGraph.addNode(ID_APP_GENERATION_AGENT,
-                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore)));
+                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, visionModel)));
             stateGraph.addNode(ID_BUILD_PREVIEW_NODE,
                     AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper)));
             stateGraph.addNode(ID_ERROR_FIX_AGENT,
-                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, vectorStore )));
+                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, visionModel)));
             stateGraph.addNode(ID_APP_SCREENSHOT_NODE,
                     AsyncNodeAction.node_async(new AppScreenshotNode(appMapper, fileFeignClient)));
             stateGraph.addNode(ID_COMMIT_NODE,

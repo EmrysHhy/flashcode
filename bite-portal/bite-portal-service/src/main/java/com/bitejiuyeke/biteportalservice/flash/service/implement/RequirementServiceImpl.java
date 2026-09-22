@@ -4,6 +4,7 @@ import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
+import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -42,12 +43,10 @@ public class RequirementServiceImpl implements IRequirementService {
         appDO.setAppDesc("待生成");
         appMapper.insert(appDO);
         String conversationId = String.valueOf(appDO.getId());
-        String content = chatClient.prompt()
+        String content = ChatContentSupport.collect(chatClient.prompt()
                 .system(getSysPrompt())
                 .user(input)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .call()
-                .content();
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)));
         AppDO parsed = buildAppDO(content);
         appDO.setAppName(parsed.getAppName());
         appDO.setAppDesc(parsed.getAppDesc());

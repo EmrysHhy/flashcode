@@ -4,11 +4,16 @@ import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 把模型生成的代码文件写到本地磁盘。
@@ -19,6 +24,55 @@ import java.util.Map;
  */
 @Slf4j
 public class FileWriterUtil {
+
+    private static final Set<String> SKIP_DIR_NAMES = Set.of(
+            "node_modules", "dist", "target", ".git", ".idea");
+
+    /**
+     * 从已落盘的源码目录读回文本文件。构建产物不读。
+     * 图状态里的 FILES 经常丢（嵌套 Map 被展平或类型对不上），磁盘才是准的。
+     */
+    public static Map<String, String> readSourceFiles(String codePath) {
+        Map<String, String> files = new LinkedHashMap<>();
+        if (codePath == null || codePath.isBlank()) {
+            return files;
+        }
+        Path root = Path.of(codePath).toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            log.warn("源码目录不存在，无法读回文件: {}", root);
+            return files;
+        }
+        try {
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (!dir.equals(root) && SKIP_DIR_NAMES.contains(dir.getFileName().toString())) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (attrs.size() > 512 * 1024) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    String relative = root.relativize(file).toString().replace('\\', '/');
+                    try {
+                        files.put(relative, Files.readString(file, StandardCharsets.UTF_8));
+                    } catch (IOException e) {
+                        log.warn("跳过无法按文本读取的文件: {}", relative);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            log.error("读取源码失败, dir={}", root, e);
+            throw new ServiceException("读取本地源码失败");
+        }
+        log.info("从磁盘读回源码, dir={}, fileCount={}", root, files.size());
+        return files;
+    }
 
     /**
      * 把 files 里的每个文件写到 user-code/{appId}/ 下面。
@@ -144,31 +198,96 @@ public class FileWriterUtil {
         });
     }
     /**
+     * 把用户上传的参考文件写到 user-reference/{appId}/。同一 appId 再次上传时覆盖该目录。
+     */
+    public static Path writeReferenceFile(Long appId, MultipartFile file) {
+        if (appId == null) {
+            throw new ServiceException("应用ID不能为空");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new ServiceException("参考文件不能为空");
+        }
+        String safeName = sanitizeFileName(file.getOriginalFilename());
+        Path refRoot = Paths.get(FlashcodeConstant.USER_REFERENCE_DIR).toAbsolutePath().normalize();
+        Path appDir = Paths.get(FlashcodeConstant.USER_REFERENCE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!appDir.startsWith(refRoot) || appDir.equals(refRoot)) {
+            throw new ServiceException("非法参考文件目录");
+        }
+        try {
+            if (Files.exists(appDir)) {
+                deleteDirectory(appDir);
+            }
+            Files.createDirectories(appDir);
+            Path target = resolveSafePath(appDir, safeName);
+            if (target == null) {
+                throw new ServiceException("非法参考文件名");
+            }
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            log.info("参考文件已写入, appId={}, file={}", appId, target);
+            return target;
+        } catch (ServiceException e) {
+            throw e;
+        } catch (IOException e) {
+            log.error("写入参考文件失败, appId={}", appId, e);
+            throw new ServiceException("写入参考文件失败");
+        }
+    }
+
+    /**
      * 删除 user-code/{appId} 下的本地源码（含 npm/maven 构建产物）。
      * 目录不存在时直接返回。不删除 user-preview，预览仍可访问。
      */
     public static void deleteCodeByAppId(Long appId) {
+        deleteAppScopedDir(FlashcodeConstant.USER_CODE_DIR, appId, "本地代码");
+    }
+
+    /**
+     * 删除 user-reference/{appId} 下的参考文件。
+     */
+    public static void deleteReferenceByAppId(Long appId) {
+        deleteAppScopedDir(FlashcodeConstant.USER_REFERENCE_DIR, appId, "参考文件");
+    }
+
+    private static void deleteAppScopedDir(String rootDirName, Long appId, String label) {
         if (appId == null) {
             throw new ServiceException("应用ID不能为空");
         }
-        Path codeRoot = Paths.get(FlashcodeConstant.USER_CODE_DIR).toAbsolutePath().normalize();
-        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+        Path root = Paths.get(rootDirName).toAbsolutePath().normalize();
+        Path appDir = Paths.get(rootDirName, String.valueOf(appId))
                 .toAbsolutePath()
                 .normalize();
-        if (!appDir.startsWith(codeRoot) || appDir.equals(codeRoot)) {
-            throw new ServiceException("非法应用目录");
+        if (!appDir.startsWith(root) || appDir.equals(root)) {
+            throw new ServiceException("非法" + label + "目录");
         }
         if (!Files.exists(appDir)) {
-            log.info("本地代码目录不存在，跳过删除, appId={}, dir={}", appId, appDir);
+            log.info("{}目录不存在，跳过删除, appId={}, dir={}", label, appId, appDir);
             return;
         }
         try {
             deleteDirectory(appDir);
-            log.info("本地代码已删除, appId={}, dir={}", appId, appDir);
+            log.info("{}已删除, appId={}, dir={}", label, appId, appDir);
         } catch (IOException e) {
-            log.error("删除本地代码失败, appId={}, dir={}", appId, appDir, e);
-            throw new ServiceException("删除本地代码失败");
+            log.error("删除{}失败, appId={}, dir={}", label, appId, appDir, e);
+            throw new ServiceException("删除" + label + "失败");
         }
+    }
+
+    private static String sanitizeFileName(String originalFilename) {
+        String name = originalFilename == null ? "" : originalFilename.trim();
+        name = name.replace('\\', '/');
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+        name = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (name.isBlank() || name.equals(".") || name.equals("..")) {
+            throw new ServiceException("参考文件名非法");
+        }
+        return name;
     }
 
     /**

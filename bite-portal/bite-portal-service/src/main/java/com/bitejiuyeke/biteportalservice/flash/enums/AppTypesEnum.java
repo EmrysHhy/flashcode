@@ -39,7 +39,8 @@ public enum AppTypesEnum {
         }
         for (AppTypesEnum item : values()) {
             if (item.name().equalsIgnoreCase(normalized)
-                    || item.type.equalsIgnoreCase(normalized)) {
+                    || item.type.equalsIgnoreCase(normalized)
+                    || String.valueOf(item.value).equals(normalized)) {
                 return item;
             }
         }

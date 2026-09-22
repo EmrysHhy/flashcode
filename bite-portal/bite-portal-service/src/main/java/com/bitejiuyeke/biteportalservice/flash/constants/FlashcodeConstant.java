@@ -49,6 +49,8 @@ public class FlashcodeConstant extends CommonConstants {
     public static final String SCREENSHOT_ATTEMPT = "screenshotAttempt";
     public static final String COMMIT_ATTEMPT = "commitAttempt";
     public static final String USER_CODE_DIR = "user-code";
+    /** 用户上传的参考文件，与 generated 代码隔离，避免 saveCode 清空 */
+    public static final String USER_REFERENCE_DIR = "user-reference";
     /**
      * 预览打包
      */
@@ -59,7 +61,10 @@ public class FlashcodeConstant extends CommonConstants {
      * 运行命令
      */
     public static final String NPM_REGISTRY = "https://registry.npmmirror.com";
-    public static final String CMD_NPM_INSTALL = "npm install --registry=" + NPM_REGISTRY;
+    public static final String CMD_NPM_INSTALL =
+            "npm install --registry=" + NPM_REGISTRY
+                    + " vue@3.3.11 vue-router@4.2.5 vite@4.5.2 @vitejs/plugin-vue@4.5.2"
+                    + " --save-exact --legacy-peer-deps";
     public static final String CMD_NPM_BUILD = "npm run build";
     public static final String CMD_MVN_PACKAGE = "mvn clean package -DskipTests";
 

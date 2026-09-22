@@ -4,12 +4,13 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
-import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
+import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
+import com.bitejiuyeke.biteportalservice.flash.utils.VisionChatSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.chat.memory.ChatMemory;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -26,18 +27,17 @@ import java.util.stream.Collectors;
 public class ErrorFixAgent implements NodeAction {
 
     private final ChatClient chatClient;
-    private final VectorStore vectorStore;
+    private final String visionModel;
 
-    public ErrorFixAgent(ChatClient chatClient,
-                              VectorStore vectorStore) {
+    public ErrorFixAgent(ChatClient chatClient, String visionModel) {
         this.chatClient = chatClient;
-        this.vectorStore = vectorStore;
+        this.visionModel = visionModel;
     }
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
-
+        log.info("\n开始修复应用代码，appId: {}\n", appId);
         try {
             if(!state.value(FlashcodeConstant.APP_IS_BUILD,Boolean.class).orElse(false)){
                 log.warn("应用构建失败，appId: {}", appId);
@@ -53,8 +53,11 @@ public class ErrorFixAgent implements NodeAction {
                 }
                 String requirement = state.value(FlashcodeConstant.REQUIREMENT, String.class).orElse(null);
                 String appTypeName = state.value(FlashcodeConstant.APP_TYPE, String.class).orElse(null);
-                Map<String, String> files = state.value(FlashcodeConstant.FILES, Map.class).orElse(null);
-                String appCode  = fixError(errorType, errorMessage, requirement, appTypeName, files);
+                Map<String, String> files = FileWriterUtil.readSourceFiles(
+                        state.value(FlashcodeConstant.CODE_PATH, String.class).orElse(null));
+                Path image = VisionChatSupport.resolveImage(
+                        state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
+                String appCode = fixError(appId, errorType, errorMessage, requirement, appTypeName, files, image);
                 log.info("修复应用代码，appId: {}, appCode: {}", appId, appCode);
 
                 Map<String, String> newFiles = AnalysisUtil.getFiles(appCode); // 解析出文件
@@ -80,13 +83,21 @@ public class ErrorFixAgent implements NodeAction {
 
     }
 
-    private String fixError(String errorType, String errorMessage, String requirement, String appTypeName, Map<String, String> files) {
+    private String fixError(Long appId, String errorType, String errorMessage, String requirement, String appTypeName,
+                            Map<String, String> files, Path image) {
         Map<String, String> currentFiles = files == null ? Map.of() : files;
-        return chatClient.prompt()
+        var spec = chatClient.prompt()
                 .system(fixSystemPrompt())
-                .user(fixUserPrompt(errorMessage, errorType, currentFiles, appTypeName, requirement))
-                .call()
-                .content();
+                .user(u -> {
+                    u.text(fixUserPrompt(errorMessage, errorType, currentFiles, appTypeName, requirement, image != null));
+                    VisionChatSupport.attachImage(u, image);
+                })
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)));
+        if (image != null) {
+            log.info("带参考图修复，切换视觉模型 {}, stage={}", visionModel, errorType);
+            spec = spec.options(VisionChatSupport.vlOptions(visionModel));
+        }
+        return ChatContentSupport.collect(spec);
     }
 
     /**
@@ -100,7 +111,7 @@ public class ErrorFixAgent implements NodeAction {
      */
     private String fixUserPrompt(String errorMessage, String errorType,
                                       Map<String, String> currentFiles, String appType,
-                                      String appDoc) {
+                                      String appDoc, boolean hasImage) {
 
         StringBuilder prompt = new StringBuilder();
 
@@ -134,6 +145,9 @@ public class ErrorFixAgent implements NodeAction {
         prompt.append("3. 确保修复后的代码能够正常编译、构建和运行\n");
         prompt.append("4. 必须输出所有文件的完整内容，包括未修改的文件\n");
         prompt.append("5. 严格按照系统提示的输出格式返回修复后的代码\n");
+        if (hasImage) {
+            prompt.append("6. 若附带参考图，修复后的界面应继续贴近参考图的布局和配色\n");
+        }
 
         return prompt.toString();
     }
@@ -213,8 +227,8 @@ public class ErrorFixAgent implements NodeAction {
                 "- 修复资源引用路径",
                 "",
                 "#### Vue3 应用",
-                "- 修复 package.json 中的依赖版本",
-                "- 修正 vite.config.js 配置",
+                "- 修复 package.json 中的依赖版本（vue 固定 3.3.11，禁止 ^ 升到 3.5）",
+                "- 修正 vite.config.js 配置（使用 path 时必须先 import/require，禁止 ReferenceError: path is not defined）",
                 "- 修复组件语法错误",
                 "- 修正路由配置错误",
                 "- 添加缺失的依赖",

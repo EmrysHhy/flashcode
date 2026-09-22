@@ -35,18 +35,21 @@ public class CommitNode implements NodeAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
+        log.info("\n开始推送代码并删除本地文件\n");
         int commitAttempt = state.value(FlashcodeConstant.COMMIT_ATTEMPT, Integer.class).orElse(0) + 1;
         try{
             String photoPathStr = state.value(FlashcodeConstant.PHOTO_PATH, String.class).orElse(null);
             Path photoPath = photoPathStr != null ? Path.of(photoPathStr) : null;
             Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
-            Map<String,String> files = state.value(FlashcodeConstant.FILES, Map.class).orElse(null);
+            Map<String, String> files = FileWriterUtil.readSourceFiles(
+                    state.value(FlashcodeConstant.CODE_PATH, String.class).orElse(null));
             // 源码推到 Gitee flash-user-code/{appId}/，后续删本地后可再 pull
             giteeService.push(appId, files);
             //定时删除
             scheduledExecutorService.schedule(() -> {
                 try {
                     FileWriterUtil.deleteCodeByAppId(appId);
+                    FileWriterUtil.deleteReferenceByAppId(appId);
                     if (photoPath != null) {
                         Files.deleteIfExists(photoPath);
                     }

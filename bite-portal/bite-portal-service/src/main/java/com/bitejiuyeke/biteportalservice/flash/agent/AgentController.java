@@ -31,9 +31,11 @@ public class AgentController {
     @PostMapping("/app/generate")
     public R<GenerateAppVO> appGenerate(@RequestParam @NotNull(message = "应用ID不能为空") Long appId,
                                         @RequestParam @NotBlank(message = "需求文档不能为空") String requirement,
-                                        @RequestParam MultipartFile reference) {
-        log.info("appGenerate: appId={}, requirement={}, reference={}", appId, requirement, reference != null ? reference.getOriginalFilename() : "null");
-            GenerateAppDTO generateAppDTO = multiAgentWorkFlow.generate(appId, requirement,reference);
+                                        @RequestParam(required = false) MultipartFile reference) {
+        log.info("appGenerate: appId={}, requirementLength={}, reference={}", appId,
+                requirement.length(), reference == null || reference.isEmpty() ? "null" : reference.getOriginalFilename());
+        GenerateAppDTO generateAppDTO = multiAgentWorkFlow.generate(appId, requirement, reference);
+        log.info("应用生成成功: appId={}, generateAppDTO={}", appId, generateAppDTO);
         return R.ok(generateAppDTO.convertToVO());
     }
 }

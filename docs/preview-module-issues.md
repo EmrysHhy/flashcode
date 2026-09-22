@@ -190,3 +190,49 @@ docker:
 - 改 Docker / 预览容器整体结构
 
 老师那边失败还能再修一轮；这边失败会直接把异常（现在含命令输出）丢回接口。
+
+
+
+
+
+
+
+现在这台虚拟机上 Milvus 已经挂了：flashcode-milvus-standalone 是 Exited (80)，etcd / minio 还活着。门户 flashcode-bite-portal-service-1 也跟着 Exited (1) 了，就是你看到的 DEADLINE_EXCEEDED。
+
+“总是炸”其实是两件事叠在一起。 容器自己会崩；门户启动时又把 milvusClient 当硬依赖，连不上就整进程退出。所以你感觉每次都是 Milvus 把整个系统拖死。
+
+这一次的真正死因
+最后一次启动只活了大约 2 分钟（10:52 起、10:54 退），日志里反复是：
+
+streaming node is not alive
+no available streaming node
+streamingnode 的 etcd lease 过期：the session is expired without activing closing
+Milvus v3.0.1 standalone 内部自带 streaming node。这个子进程一死，整个 standalone 就以 exit 80 退出。这不是门户代码写错，也不是这次 OOM（OOMKilled=false）。
+
+更麻烦的是它已经 重启了 135 次。最后 Docker 自己也卡死了：
+
+Error=failed to create task for container: AlreadyExists: task ... already exists
+containerd 里残留了一份旧 task，restart: always 再也拉不起来，所以它已经死了几个小时，19530 现在根本没人在听。门户再连 192.168.56.107:19530，DNS 很快（几毫秒），gRPC 握手空等 60 秒，然后 Spring 上下文失败。
+
+为什么你会觉得“每次都炸”
+同一套环境里叠了好几层，表现都像“Milvus 挂了”：
+
+现象	原因
+exit 80 + streaming node（当前）
+v3.0.1 standalone 的 streaming 组件不稳，lease 一丢就整容器退出
+exit 80 + 端口映射
+docker-compose.yml 仍是裸写 19530:19530，会顺带绑 [::]:19530。VirtualBox 上 docker-proxy 很容易卡死，下次起不来也是 80。docker-compose-mid.yml 已经改成只绑 0.0.0.0
+exit 134
+数据目录权限，后来加了 user: root
+门户 DEADLINE_EXCEEDED
+Spring AI 启动期就建 milvusClient。Milvus 还在 health: starting、已经退出、或 19530 没映射，门户都会直接起不来
+启动顺序
+门户不在 compose 里 depends_on Milvus healthy；冷启动 Milvus 经常要 2～3 分钟
+当前端口绑定已经是 IPv4 only，所以这一次不是 IPv6 proxy，是 3.x 的 streaming node 崩了，再被 Docker 的残留 task 锁死。
+
+和门户的关系
+VectorConfig 注入了 MilvusVectorStore，自动配置会在启动时创建 milvusClient。连不上就：
+
+milvusClient → vectorStore → 整棵 Spring 树失败 → 门户退出。
+
+Nacos 里 host 配 192.168.56.107:19530 没问题（DNS 很快），超时说明 对端没在听，不是地址写错。

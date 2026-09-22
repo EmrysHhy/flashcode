@@ -3,12 +3,12 @@ package com.bitejiuyeke.biteportalservice.flash.service.implement;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
-import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
+import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.biteportalservice.flash.utils.CommandUtil;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
@@ -60,25 +60,23 @@ public class AppServiceImpl implements IAppService {
      */
     @Override
     public GenerateAppDTO appGenerate(Long appId, String requirement) {
+        appMapper.insertIfAbsent(appId);
         //生成代码
-        String appCode = chatClient.prompt()
+        String appCode = ChatContentSupport.collect(chatClient.prompt()
                 .system(getSysPrompt(appId))
                 .user(getUserPrompt(requirement))
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
-                        .build())
-                .call()
-                .content();
+                        .build()));
         log.info("生成应用代码完成，appId: {}, appCode: {}", appId, appCode);
 
         Map<String, String> files = AnalysisUtil.getFiles(appCode);
         AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);
         //更新数据库类型 updateType(appId, appType)
-        AppDO appDO = appMapper.selectById(appId);
-        if (appDO != null) {
-            appDO.setAppType(appType.getValue());
-            appMapper.updateById(appDO);
+        int updated = appMapper.updateTypeById(appId, appType.getValue());
+        if (updated <= 0) {
+            throw new ServiceException("更新应用类型失败，app 不存在, appId=" + appId + ", appType=" + appType.getValue());
         }
         //本地代码保存
         Path codePath = FileWriterUtil.saveCode(appId, files);
@@ -200,7 +198,7 @@ public class AppServiceImpl implements IAppService {
                 "- **配置强制要求**：",
                 "  - `vite.config.js`：必须配置 `base: './'`，配置 `@` 别名指向 `./src`。",
                 "  - `router`：必须使用 `createWebHashHistory()`。",
-                "  - `package.json`：必须包含 `dev` (`vite`) 和 `build` (`vite build`) 脚本。",
+                "  - `package.json`：必须包含 `dev` (`vite`) 和 `build` (`vite build`) 脚本。依赖写死版本、禁止 `^`：vue `3.3.11`，vue-router `4.2.5`，vite `4.5.2`，@vitejs/plugin-vue `4.5.2`。",
                 "  - `index.html`：禁止空文件。必须是完整 Vite 入口 HTML，至少包含 `<div id=\"app\"></div>` 和 `<script type=\"module\" src=\"/src/main.js\"></script>`。",
                 "- **质量保证**：",
                 "  - 必须能够通过 `npm install` 安装项目所需依赖，并且能够通过 `npm run build` 正确完成构建生成dist目录",
