@@ -23,71 +23,86 @@ import java.util.concurrent.TimeUnit;
 public class CaptchaService {
 
     /**
-     * redis服务类
+     * 验证码与发送次数缓存
      */
     @Autowired
     private RedisService redisService;
 
     /**
-     * 单个手机号，每日发送短信次数的限制
+     * 每日发送上限，配置项 captcha.send-limit
      */
-    @Value("${sms.send-limit:}")
+    @Value("${captcha.send-limit:}")
     private Integer sendLimit;
 
     /**
-     * 验证码的有效期，单位是分钟
+     * 验证码有效期（分钟），配置项 captcha.code-expiration
      */
-    @Value("${sms.code-expiration:}")
+    @Value("${captcha.code-expiration:}")
     private Long phoneCodeExpiration;
 
     /**
-     * 用来判断是否发送随机验证码
+     * 是否真实发送并使用随机码，配置项 captcha.send-message
      */
-    @Value("${sms.send-message:false}")
+    @Value("${captcha.send-message:false}")
     private boolean sendMessage;
 
     /**
-     * 阿里云短信服务
+     * 短信发送通道
      */
     @Autowired
     private AliSmsService aliSmsService;
 
     /**
-     * 发送验证码
-     * @param phone 手机号
+     * 邮件发送通道
+     */
+    @Autowired
+    private EmailService emailService;
+
+    /**
+     * 发送验证码（手机号走短信，邮箱走邮件）
+     *
+     * @param account 手机号或邮箱
      * @return 验证码
      */
-    public String sendCode(String phone) {
-        // 1 校验是否超过每日的发送限制（针对每个手机号）
-        String limitCacheKey = MessageConstants.SMS_CODE_TIMES_KEY + phone;
+    public String sendCode(String account) {
+        // 1 先校验手机号，再校验邮箱，格式都不对则抛异常
+        boolean isPhone = VerifyUtil.checkPhone(account);
+        boolean isEmail = !isPhone && VerifyUtil.checkEmail(account);
+        if (!isPhone && !isEmail) {
+            throw new ServiceException("手机号或邮箱格式错误", ResultCode.INVALID_PARA.getCode());
+        }
+
+        String limitCacheKey = (isPhone ? MessageConstants.SMS_CODE_TIMES_KEY : MessageConstants.EMAIL_CODE_TIMES_KEY) + account;
+        String codeKey = (isPhone ? MessageConstants.SMS_CODE_KEY : MessageConstants.EMAIL_CODE_KEY) + account;
+
+        // 2 按通道选择 Redis key，校验每日上限与 1 分钟内防刷
         Integer times = redisService.getCacheObject(limitCacheKey, Integer.class);
         times = times == null ? 0 : times;
         if (times >= sendLimit) {
             throw new ServiceException(ResultCode.SEND_MSG_FAILED);
         }
 
-        // 2 校验是否在1分钟内频繁发送
-        String codeKey = MessageConstants.SMS_CODE_KEY + phone;
         String cacheValue = redisService.getCacheObject(codeKey, String.class);
-        long expireTime =  redisService.getExpire(codeKey);
+        long expireTime = redisService.getExpire(codeKey);
         if (!StringUtils.isEmpty(cacheValue) && expireTime > phoneCodeExpiration * 60 - 60) {
             long time = expireTime - phoneCodeExpiration * 60 + 60;
-            throw new ServiceException("操作频繁， 请在"+ time+ "秒之后再试", ResultCode.INVALID_PARA.getCode());
+            throw new ServiceException("操作频繁， 请在" + time + "秒之后再试", ResultCode.INVALID_PARA.getCode());
         }
 
-        // 3 生成验证码
-        String verifyCode = sendMessage ? VerifyUtil.generateVerifyCode(MessageConstants.DEFAULT_SMS_LENGTH) : MessageConstants.DEFAULT_SMS_CODE;
+        // 3 生成验证码；sendMessage 为 true 时手机走短信、邮箱走邮件
+        String verifyCode = generateCode();
 
-        // 4 发送线上短信
         if (sendMessage) {
-            boolean result = aliSmsService.sendMobileCode(phone, verifyCode);
+            boolean result = isPhone
+                    ? aliSmsService.sendMobileCode(account, verifyCode)
+                    : emailService.sendEmail(account, verifyCode);
             if (!result) {
                 throw new ServiceException(ResultCode.SEND_MSG_FAILED);
             }
         }
-        // 5 设置验证码的缓存
+
+        // 4 写入验证码与当日发送次数
         redisService.setCacheObject(codeKey, verifyCode, phoneCodeExpiration, TimeUnit.MINUTES);
-        //  6 设置发送次数限制的缓存 （无法预先设置缓存，只能先读后写）
         long seconds = ChronoUnit.SECONDS.between(LocalDateTime.now(),
                 LocalDateTime.now().plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0));
         redisService.setCacheObject(limitCacheKey, times + 1, seconds, TimeUnit.SECONDS);
@@ -95,35 +110,84 @@ public class CaptchaService {
     }
 
     /**
-     * 从缓存中获取手机号的验证码
-     * @param phone 手机号
+     * 校验邮箱与验证码是否匹配
+     *
+     * @param email 邮箱
+     * @param code  验证码
+     * @return 是否匹配
+     */
+    public boolean checkEmailCode(String email, String code) {
+        String cached = getEmailCode(email);
+        if (cached == null || StringUtils.isEmpty(cached)) {
+            throw new ServiceException(ResultCode.INVALID_CODE);
+        }
+        return cached.equals(code);
+    }
+
+    /**
+     * 从缓存中获取邮箱的验证码
+     *
+     * @param email 邮箱
+     * @return 验证码，不存在时返回 null
+     */
+    public String getEmailCode(String email) {
+        return redisService.getCacheObject(MessageConstants.EMAIL_CODE_KEY + email, String.class);
+    }
+
+    /**
+     * 从缓存中删除邮箱的验证码
+     *
+     * @param email 邮箱
+     * @return 是否删除成功
+     */
+    public boolean deleteEmailCode(String email) {
+        return redisService.deleteObject(MessageConstants.EMAIL_CODE_KEY + email);
+    }
+
+    /**
+     * 生成验证码
+     * sendMessage 为 true 时返回随机码，否则返回固定码
+     *
      * @return 验证码
      */
+    private String generateCode() {
+        return sendMessage
+                ? VerifyUtil.generateVerifyCode(MessageConstants.DEFAULT_SMS_LENGTH)
+                : MessageConstants.DEFAULT_SMS_CODE;
+    }
+
+    /**
+     * 从缓存中获取手机号的验证码
+     *
+     * @param phone 手机号
+     * @return 验证码，不存在时返回 null
+     */
     public String getCode(String phone) {
-        String cacheKey = MessageConstants.SMS_CODE_KEY + phone;
-        return redisService.getCacheObject(cacheKey, String.class);
+        return redisService.getCacheObject(MessageConstants.SMS_CODE_KEY + phone, String.class);
     }
 
     /**
      * 从缓存中删除手机号的验证码
+     *
      * @param phone 手机号
-     * @return 验证码
+     * @return 是否删除成功
      */
     public boolean deleteCode(String phone) {
-        String cacheKey = MessageConstants.SMS_CODE_KEY + phone;
-        return redisService.deleteObject(cacheKey);
+        return redisService.deleteObject(MessageConstants.SMS_CODE_KEY + phone);
     }
 
     /**
      * 校验手机号与验证码是否匹配
+     *
      * @param phone 手机号
-     * @param code 验证码
-     * @return 布尔类型
+     * @param code  验证码
+     * @return 是否匹配
      */
     public boolean checkCode(String phone, String code) {
-        if (getCode(phone) == null || StringUtils.isEmpty(getCode(phone))) {
+        String cached = getCode(phone);
+        if (cached == null || StringUtils.isEmpty(cached)) {
             throw new ServiceException(ResultCode.INVALID_CODE);
         }
-        return getCode(phone).equals(code);
+        return cached.equals(code);
     }
 }

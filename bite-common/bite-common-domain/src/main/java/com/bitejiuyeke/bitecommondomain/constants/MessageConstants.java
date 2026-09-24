@@ -21,6 +21,16 @@ public class MessageConstants {
     public static final String SMS_CODE_KEY = "sms:code:";
 
     /**
+     * 邮件发送次数的 key
+     */
+    public static final String EMAIL_CODE_TIMES_KEY = "email:times:";
+
+    /**
+     * 邮件验证码的 key
+     */
+    public static final String EMAIL_CODE_KEY = "email:code:";
+
+    /**
      * 默认验证码的长度
      */
     public static final int DEFAULT_SMS_LENGTH = 6;

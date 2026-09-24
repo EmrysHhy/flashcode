@@ -22,6 +22,10 @@ public class AppUserListReqDTO extends BasePageReqDTO  implements Serializable {
      * 手机号
      */
     private String phoneNumber;
+    /**
+     * 邮箱
+     */
+    private String email;
 
     /**
      * 昵称
