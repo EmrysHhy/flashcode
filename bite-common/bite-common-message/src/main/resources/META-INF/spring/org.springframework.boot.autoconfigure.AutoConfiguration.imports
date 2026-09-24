@@ -1,3 +1,5 @@
 com.bitejiuyeke.bitecommonmessage.config.AliSmsConfig
+com.bitejiuyeke.bitecommonmessage.config.EmailConfig
 com.bitejiuyeke.bitecommonmessage.service.AliSmsService
 com.bitejiuyeke.bitecommonmessage.service.CaptchaService
+com.bitejiuyeke.bitecommonmessage.service.EmailService

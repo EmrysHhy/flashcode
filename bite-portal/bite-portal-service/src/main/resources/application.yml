@@ -1,0 +1,5 @@
+# 默认头像原先只在 Nacos 的 bite-admin-dev.yaml 中。
+# 门户读 bite-portal-dev.yaml，本地补一份，Nacos 里同名配置会覆盖这里。
+appuser:
+  info:
+    defaultAvatar: https://你的阿里云OSS桶名称.oss-cn-chengdu.aliyuncs.com/你的阿里云OSS路径前缀/web/profile/default-avatar.png

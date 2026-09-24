@@ -88,7 +88,7 @@ public class AppServiceImpl implements IAppService {
         // 3. 得到URL预览地址
         String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
         // 4. 更新数据库中的预览地址
-        int updated = appMapper.updateUrlById(appId, url);
+        updated = appMapper.updateUrlById(appId, url);
         if(updated <= 0){
             log.error("更新预览地址失败，appId: {}, url: {}", appId, url);
             throw new ServiceException("更新预览地址失败");
