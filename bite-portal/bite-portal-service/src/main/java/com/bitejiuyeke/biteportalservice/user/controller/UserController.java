@@ -3,10 +3,10 @@ package com.bitejiuyeke.biteportalservice.user.controller;
 import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqDTO;
 import com.bitejiuyeke.bitecommondomain.domain.R;
 import com.bitejiuyeke.bitecommondomain.domain.vo.TokenVO;
-import com.bitejiuyeke.biteportalservice.user.entity.dto.CodeLoginDTO;
-import com.bitejiuyeke.biteportalservice.user.entity.dto.WechatLoginDTO;
-import com.bitejiuyeke.biteportalservice.user.entity.vo.UserVo;
-import com.bitejiuyeke.biteportalservice.user.service.IUserService;
+import com.bitejiuyeke.biteportalservice.user.domain.dto.CodeLoginDTO;
+import com.bitejiuyeke.biteportalservice.user.domain.dto.WechatLoginDTO;
+import com.bitejiuyeke.biteportalservice.user.domain.vo.UserVo;
+import com.bitejiuyeke.biteportalservice.user.service.ILoginUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     @Autowired
-    private IUserService userService;
+    private ILoginUserService userService;
 
     /**
      * 微信登录

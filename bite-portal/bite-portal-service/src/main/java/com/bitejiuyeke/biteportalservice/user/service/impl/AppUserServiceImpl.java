@@ -40,12 +40,6 @@ public class AppUserServiceImpl implements IAppUserService {
     private String defaultAvatar;
 
     /**
-     * rabbitMq工具类对象
-     */
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
-
-    /**
      * 根据微信ID注册用户
      * @param openId 微信ID
      * @return C端用户DTO
@@ -84,11 +78,7 @@ public class AppUserServiceImpl implements IAppUserService {
         if (appUser == null) {
             return null;
         }
-        AppUserDTO appUserDTO = new AppUserDTO();
-        BeanUtils.copyProperties(appUser, appUserDTO);
-        // 3 处理手机号
-        appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
-        return appUserDTO;
+        return toAppUserDTO(appUser);
     }
 
     /**
@@ -107,12 +97,7 @@ public class AppUserServiceImpl implements IAppUserService {
         if (appUser == null) {
             return null;
         }
-        // 3 对查出来的结果进行类型转换
-        AppUserDTO appUserDTO = new AppUserDTO();
-        BeanUtils.copyProperties(appUser, appUserDTO);
-        appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
-        appUserDTO.setUserId(appUser.getId());
-        return appUserDTO;
+        return toAppUserDTO(appUser);
     }
 
     /**
@@ -139,6 +124,35 @@ public class AppUserServiceImpl implements IAppUserService {
     }
 
     @Override
+    public AppUserDTO findByEmail(String email) {
+        if (StringUtils.isEmpty(email)) {
+            return null;
+        }
+        AppUser appUser = appUserMapper.selectByEmail(AESUtil.encryptHex(email));
+        if (appUser == null) {
+            return null;
+        }
+        return toAppUserDTO(appUser);
+    }
+
+    @Override
+    public AppUserDTO registerByEmail(String email) {
+        if (StringUtils.isEmpty(email)) {
+            throw new ServiceException("要注册邮箱是空的", ResultCode.INVALID_PARA.getCode());
+        }
+        AppUser appUser = new AppUser();
+        appUser.setEmail(AESUtil.encryptHex(email));
+        appUser.setNickName("比特用户" + (int) (Math.random() * 9000) + 1000);
+        appUser.setAvatar(defaultAvatar);
+        appUserMapper.insert(appUser);
+        AppUserDTO appUserDTO = new AppUserDTO();
+        BeanUtils.copyProperties(appUser, appUserDTO);
+        appUserDTO.setEmail(email);
+        appUserDTO.setUserId(appUser.getId());
+        return appUserDTO;
+    }
+
+    @Override
     public void edit(UserEditReqDTO userEditReqDTO) {
         // 1 根据ID查询要编辑的用户
         AppUser appUser = appUserMapper.selectById(userEditReqDTO.getUserId());
@@ -149,15 +163,6 @@ public class AppUserServiceImpl implements IAppUserService {
         appUser.setNickName(userEditReqDTO.getNickName());
         appUser.setAvatar(userEditReqDTO.getAvtar());
         appUserMapper.updateById(appUser);
-        /*// 3 发送广播消息
-        AppUserDTO appUserDTO = new AppUserDTO();
-        BeanUtils.copyProperties(appUser, appUserDTO);
-        appUserDTO.setUserId(appUser.getId());
-        try {
-            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "", appUserDTO);
-        } catch (Exception exception) {
-            log.error("编辑用户发送消息失败", exception);
-        }*/
     }
 
     /**
@@ -167,8 +172,9 @@ public class AppUserServiceImpl implements IAppUserService {
      */
     @Override
     public BasePageDTO<AppUserDTO> getUserList(AppUserListReqDTO appUserListReqDTO) {
-        // 1 先把手机号转变过来
+        // 1 先把手机号和邮箱转变过来
         appUserListReqDTO.setPhoneNumber(AESUtil.encryptHex(appUserListReqDTO.getPhoneNumber()));
+        appUserListReqDTO.setEmail(AESUtil.encryptHex(appUserListReqDTO.getEmail()));
         BasePageDTO<AppUserDTO> result = new BasePageDTO();
 
         // 2 查询总数
@@ -194,13 +200,8 @@ public class AppUserServiceImpl implements IAppUserService {
         // 5 对象列表结果转换
         result.setList(
                 appUserList.stream()
-                        .map(appUser -> {
-                            AppUserDTO appUserDTO = new AppUserDTO();
-                            BeanUtils.copyProperties(appUser, appUserDTO);
-                            appUserDTO.setUserId(appUser.getId());
-                            appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
-                            return appUserDTO;
-                        }).collect(Collectors.toList())
+                        .map(this::toAppUserDTO)
+                        .collect(Collectors.toList())
         );
         return result;
     }
@@ -221,12 +222,7 @@ public class AppUserServiceImpl implements IAppUserService {
         if (appUser == null) {
             return null;
         }
-        // 3 对象转换
-        AppUserDTO appUserDTO = new AppUserDTO();
-        BeanUtils.copyProperties(appUser, appUserDTO);
-        appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
-        appUserDTO.setUserId(appUser.getId());
-        return appUserDTO;
+        return toAppUserDTO(appUser);
     }
 
     /**
@@ -245,12 +241,20 @@ public class AppUserServiceImpl implements IAppUserService {
 
         // 3 对象转换
         return appUserList.stream()
-                .map(appUser -> {
-                    AppUserDTO appUserDTO = new AppUserDTO();
-                    BeanUtils.copyProperties(appUser, appUserDTO);
-                    appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
-                    appUserDTO.setUserId(appUser.getId());
-                    return appUserDTO;
-                }).collect(Collectors.toList());
+                .map(this::toAppUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    private AppUserDTO toAppUserDTO(AppUser appUser) {
+        AppUserDTO appUserDTO = new AppUserDTO();
+        BeanUtils.copyProperties(appUser, appUserDTO);
+        appUserDTO.setUserId(appUser.getId());
+        if (StringUtils.isNotEmpty(appUser.getPhoneNumber())) {
+            appUserDTO.setPhoneNumber(AESUtil.decryptHex(appUser.getPhoneNumber()));
+        }
+        if (StringUtils.isNotEmpty(appUser.getEmail())) {
+            appUserDTO.setEmail(AESUtil.decryptHex(appUser.getEmail()));
+        }
+        return appUserDTO;
     }
 }

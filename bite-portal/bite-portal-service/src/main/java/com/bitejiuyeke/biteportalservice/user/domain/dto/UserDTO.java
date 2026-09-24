@@ -1,7 +1,7 @@
-package com.bitejiuyeke.biteportalservice.user.entity.dto;
+package com.bitejiuyeke.biteportalservice.user.domain.dto;
 
 import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
-import com.bitejiuyeke.biteportalservice.user.entity.vo.UserVo;
+import com.bitejiuyeke.biteportalservice.user.domain.vo.UserVo;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.springframework.beans.BeanUtils;

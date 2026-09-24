@@ -1,4 +1,4 @@
-package com.bitejiuyeke.biteportalservice.user.entity.dto;
+package com.bitejiuyeke.biteportalservice.user.domain.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -12,10 +12,14 @@ import lombok.EqualsAndHashCode;
 public class CodeLoginDTO extends LoginDTO {
 
     /**
-     * 手机号
+     * 手机号（与邮箱二选一）
      */
-    @NotBlank(message = "手机号不能为空")
     private String phone;
+
+    /**
+     * 邮箱（与手机号二选一）
+     */
+    private String email;
 
     /**
      * 验证码

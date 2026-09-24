@@ -1,4 +1,4 @@
-package com.bitejiuyeke.biteportalservice.user.entity.vo;
+package com.bitejiuyeke.biteportalservice.user.domain.vo;
 
 import com.bitejiuyeke.bitecommondomain.domain.vo.LoginUserVO;
 import lombok.Data;

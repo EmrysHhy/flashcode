@@ -29,6 +29,13 @@ public interface AppUserMapper extends BaseMapper<AppUser> {
     AppUser selectByPhoneNumber(@Param("phoneNumber") String phoneNumber);
 
     /**
+     * 根据邮箱查询用户信息
+     * @param email 邮箱
+     * @return C端用户
+     */
+    AppUser selectByEmail(@Param("email") String email);
+
+    /**
      * 查询总数
      * @param appUserListReqDTO 查询C端用户DTO
      * @return 用户总数

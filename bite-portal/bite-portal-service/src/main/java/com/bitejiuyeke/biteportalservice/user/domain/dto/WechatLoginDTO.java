@@ -1,4 +1,4 @@
-package com.bitejiuyeke.biteportalservice.user.entity.dto;
+package com.bitejiuyeke.biteportalservice.user.domain.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

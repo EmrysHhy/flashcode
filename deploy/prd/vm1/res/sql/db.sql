@@ -4414,11 +4414,14 @@ INSERT INTO sys_dictionary_data (type_key,data_key,value,remark,sort,status) VAL
 CREATE TABLE `app_user` (
                             `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '自增主键',
                             `nick_name` varchar(64) DEFAULT NULL COMMENT '昵称',
-                            `phone_number` varchar(64) NOT NULL COMMENT '电话',
+                            `phone_number` varchar(64) DEFAULT NULL COMMENT '电话',
+                            `email` varchar(255) DEFAULT NULL COMMENT '邮箱',
                             `open_id` varchar(64) DEFAULT NULL COMMENT '微信用户openId',
                             `avatar` varchar(255) DEFAULT NULL COMMENT '头像',
                             PRIMARY KEY (`id`) USING BTREE,
-                            UNIQUE KEY `uk_phone` (`phone_number`) USING BTREE
+                            UNIQUE KEY `uk_phone` (`phone_number`) USING BTREE,
+                            UNIQUE KEY `uk_email` (`email`) USING BTREE,
+                            UNIQUE KEY `uk_open_id` (`open_id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=10000001 DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='应用端人员表';
 
 -- sys_user definition

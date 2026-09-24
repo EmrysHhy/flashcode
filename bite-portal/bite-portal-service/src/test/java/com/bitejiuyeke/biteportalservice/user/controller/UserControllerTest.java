@@ -2,9 +2,9 @@ package com.bitejiuyeke.biteportalservice.user.controller;
 import com.bitejiuyeke.bitecommonmessage.service.AliSmsService;
 import com.bitejiuyeke.bitecommonmessage.service.CaptchaService;
 import com.bitejiuyeke.biteportalservice.BitePortalServiceApplication;
-import com.bitejiuyeke.biteportalservice.user.entity.dto.CodeLoginDTO;
-import com.bitejiuyeke.biteportalservice.user.entity.dto.WechatLoginDTO;
-import com.bitejiuyeke.biteportalservice.user.service.IUserService;
+import com.bitejiuyeke.biteportalservice.user.domain.dto.CodeLoginDTO;
+import com.bitejiuyeke.biteportalservice.user.domain.dto.WechatLoginDTO;
+import com.bitejiuyeke.biteportalservice.user.service.ILoginUserService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 public class UserControllerTest {
 
     @Autowired
-    private IUserService userService;
+    private ILoginUserService userService;
 
     @Autowired
     private AliSmsService aliSmsService;

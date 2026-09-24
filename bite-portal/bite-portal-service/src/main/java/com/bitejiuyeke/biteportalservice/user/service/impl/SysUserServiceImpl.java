@@ -2,6 +2,7 @@ package com.bitejiuyeke.biteportalservice.user.service.impl;
 
 import cn.hutool.crypto.digest.DigestUtil;
 
+import com.bitejiuyeke.biteadminapi.config.feign.DictionaryFeignClient;
 import com.bitejiuyeke.bitecommoncore.utils.AESUtil;
 import com.bitejiuyeke.bitecommoncore.utils.VerifyUtil;
 import com.bitejiuyeke.bitecommondomain.domain.ResultCode;
@@ -41,7 +42,8 @@ public class SysUserServiceImpl implements ISysUserService {
      */
     @Autowired
     private TokenService tokenService;
-
+    @Autowired
+    private DictionaryFeignClient sysDictionaryService;
     /**
      * B端用户账户密码登录
      *
