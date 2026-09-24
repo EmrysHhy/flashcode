@@ -34,13 +34,14 @@ public class UserController {
     }
 
     /**
-     * 发送短信验证码
-     * @param phone 手机号
+     * 发送验证码（手机号或邮箱）
+     *
+     * @param account 手机号或邮箱
      * @return 验证码
      */
     @GetMapping("/send_code")
-    public R<String> sendCode(String phone) {
-        return R.ok(userService.sendCode(phone));
+    public R<String> sendCode(String account) {
+        return R.ok(userService.sendCode(account));
     }
 
     /**

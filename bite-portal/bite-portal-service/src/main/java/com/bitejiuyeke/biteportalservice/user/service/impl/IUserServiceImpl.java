@@ -23,11 +23,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * 门户用户服务实现类
  */
-@Component
+@Service
 @Slf4j
 public class IUserServiceImpl implements IUserService {
 
@@ -63,16 +64,14 @@ public class IUserServiceImpl implements IUserService {
     }
 
     /**
-     * 发送短信验证码
-     * @param phone 手机号
+     * 发送验证码（手机号或邮箱）
+     *
+     * @param account 手机号或邮箱
      * @return 验证码
      */
     @Override
-    public String sendCode(String phone) {
-        if (!VerifyUtil.checkPhone(phone)) {
-            throw new ServiceException("手机号格式错误", ResultCode.INVALID_PARA.getCode());
-        }
-        return captchaService.sendCode(phone);
+    public String sendCode(String account) {
+        return captchaService.sendCode(account);
     }
 
     /**

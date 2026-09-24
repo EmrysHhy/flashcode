@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bitejiuyeke.biteadminservice.user.mapper.SysUserMapper">
+
+    <select id="selectByPhoneNumber" parameterType="java.lang.String" resultType="com.bitejiuyeke.biteadminservice.user.domain.entity.SysUser">
+        select * from sys_user where phone_number = #{phoneNumber}
+    </select>
+
+    <select id="selectList" parameterType="com.bitejiuyeke.biteadminservice.user.domain.entity.SysUser" resultType="com.bitejiuyeke.biteadminservice.user.domain.entity.SysUser">
+        select *from sys_user
+        <where>
+            <if test="id !=null and id != ''">
+                AND id = #{id}
+            </if>
+            <if test="phoneNumber !=null and phoneNumber != ''">
+                AND phone_number = #{phoneNumber}
+            </if>
+            <if test="status !=null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+</mapper>

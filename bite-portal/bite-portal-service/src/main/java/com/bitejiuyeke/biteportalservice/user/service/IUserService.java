@@ -13,7 +13,7 @@ public interface IUserService {
 
     TokenDTO login(LoginDTO loginDTO);
 
-    String sendCode(String phone);
+    String sendCode(String account);
 
     void edit(UserEditReqDTO userEditReqDTO);
 
