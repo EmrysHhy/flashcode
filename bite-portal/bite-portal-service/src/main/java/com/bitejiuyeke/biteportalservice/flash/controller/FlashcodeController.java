@@ -1,8 +1,10 @@
 package com.bitejiuyeke.biteportalservice.flash.controller;
 
 import com.bitejiuyeke.bitecommondomain.domain.R;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RequirementDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.vo.AppDetailVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
@@ -56,12 +58,16 @@ public class FlashcodeController {
         RequirementDTO requirementDTO = flashCodeService.generateRequirement(input);
         return R.ok(requirementDTO.convertToVO());
     }
-    @PostMapping("/app/generate")
+   /* @PostMapping("/generate")
     public R<GenerateAppVO> appGenerate(@RequestParam Long appId, @RequestParam String requirement){
         log.info("收到生成应用请求\nappId：{}\n需求文档：{}", appId, requirement);
         GenerateAppDTO generateAppDTO = appService.appGenerate(appId,requirement);
         return R.ok(generateAppDTO.convertToVO());
+    }*/
+    @GetMapping("/detail")
+    public R<AppDetailVO> appDetail(@RequestParam Long appId){
+        log.info("收到查询应用详情请求，appId：{}", appId);
+        AppDetailDTO appDetailDTO = appService.getAppDetail(appId);
+        return R.ok(appDetailDTO.convertToVO());
     }
-
-
 }

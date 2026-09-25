@@ -1,6 +1,5 @@
-package com.bitejiuyeke.biteportalservice.flash.domain.dto;
+package com.bitejiuyeke.biteportalservice.flash.domain.dto.result;
 
-import ch.qos.logback.core.joran.action.PreconditionValidator;
 import com.bitejiuyeke.bitecommoncore.utils.BeanCopyUtil;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;

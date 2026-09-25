@@ -1,9 +1,14 @@
 package com.bitejiuyeke.biteportalservice.flash.service.implement;
 
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
+import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
+import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
+import com.bitejiuyeke.biteportalservice.flash.enums.DeployStatusEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
@@ -40,6 +45,8 @@ public class AppServiceImpl implements IAppService {
     ChatClient chatClient;
     @Autowired
     AppMapper appMapper;
+    @Autowired
+    TokenService tokenService;
     @Autowired
     IGiteeService giteeService;
     @Autowired
@@ -108,6 +115,28 @@ public class AppServiceImpl implements IAppService {
         generateAppDTO.setAppType(appType);
         generateAppDTO.setUrl(url);
         return generateAppDTO;
+    }
+
+    @Override
+    public AppDetailDTO getAppDetail(Long appId) {
+        AppDO app = appMapper.selectById(appId);
+        if (app == null) {
+            throw new ServiceException("应用不存在");
+        }
+        if (app.getDeployStatus() != DeployStatusEnum.DEPLOYED) {
+            LoginUserDTO loginUser = tokenService.getLoginUser();
+            if (loginUser == null || !"app".equals(loginUser.getUserFrom())
+                    || !app.getUserId().equals(loginUser.getUserId())) {
+                throw new ServiceException("无权查看该应用");
+            }
+        }
+        AppDetailDTO appDetailDTO = new AppDetailDTO();
+        appDetailDTO.setId(app.getId());
+        appDetailDTO.setUserId(app.getUserId());
+        appDetailDTO.setAppName(app.getAppName());
+        appDetailDTO.setAppType(app.getAppType());
+        appDetailDTO.setPreviewUrl(app.getAppPreviewUrl());
+        return appDetailDTO;
     }
 
     /**

@@ -1,6 +1,6 @@
 package com.bitejiuyeke.biteportalservice.flash.service.implement;
 
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
@@ -82,7 +82,7 @@ public class RequirementServiceImpl implements IRequirementService {
      */
     private AppDO buildAppDO(String content) {
         AppDO appDO = new AppDO();
-        appDO.setUserId(999L);
+        appDO.setUserId(tokenService.getLoginUser().getUserId());
         appDO.setAppDoc(content);
         Pattern appNamePattern = Pattern.compile(
                 "##\\s*1\\.\\s*应用名称\\s*\\r?\\n(.*?)(?=\\r?\\n\\s*##\\s*2\\.\\s*应用描述)",

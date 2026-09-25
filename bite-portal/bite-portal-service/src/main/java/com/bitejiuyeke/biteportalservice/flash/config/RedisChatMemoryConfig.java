@@ -3,7 +3,7 @@ package com.bitejiuyeke.biteportalservice.flash.config;
 import com.bitejiuyeke.bitecommoncore.utils.BeanCopyUtil;
 import com.bitejiuyeke.bitecommonredis.service.RedisService;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.RedisChatHistoryDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RedisChatHistoryDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.biteportalservice.flash.mapper.ChatHistoryMapper;
 import com.bitejiuyeke.biteportalservice.flash.enums.Role;

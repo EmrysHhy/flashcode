@@ -1,6 +1,7 @@
 package com.bitejiuyeke.biteportalservice.flash.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.ChatHistoryReqParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.ChatHistoryDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -38,4 +39,14 @@ public interface ChatHistoryMapper extends BaseMapper<ChatHistoryDO> {
      */
     @Update("UPDATE chat_history SET is_deleted = 1 WHERE app_id = #{appId}")
     void deleteByAppId(Long appId);
+
+    /**
+     * 分页查询某个用户的未删除聊天记录。
+     */
+    List<ChatHistoryDO> selectChatHistory(ChatHistoryReqParam chatHistoryReqParam);
+
+    /**
+     * 统计某个用户的未删除聊天记录数量。
+     */
+    Long countChatHistory(ChatHistoryReqParam chatHistoryReqParam);
 }

@@ -1,7 +1,7 @@
 package com.bitejiuyeke.biteportalservice.flash.agent;
 
 import com.bitejiuyeke.bitecommondomain.domain.R;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

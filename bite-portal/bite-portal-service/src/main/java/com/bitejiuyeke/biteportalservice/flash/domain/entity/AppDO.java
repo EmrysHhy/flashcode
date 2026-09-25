@@ -2,6 +2,7 @@ package com.bitejiuyeke.biteportalservice.flash.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.bitejiuyeke.bitecommoncore.domain.entity.BaseDO;
+import com.bitejiuyeke.biteportalservice.flash.enums.DeployStatusEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -39,6 +40,11 @@ public class AppDO extends BaseDO {
      * 应用预览地址
      */
     private String appPreviewUrl;
+
+    /**
+     * 部署状态：0=未部署，1=已部署
+     */
+    private DeployStatusEnum deployStatus;
 
     /**
      * 应用类型：0=html, 1=vue3, 2=vue3_spring

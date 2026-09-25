@@ -1,4 +1,4 @@
-package com.bitejiuyeke.biteportalservice.flash.domain.dto;
+package com.bitejiuyeke.biteportalservice.flash.domain.dto.result;
 
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import lombok.Data;

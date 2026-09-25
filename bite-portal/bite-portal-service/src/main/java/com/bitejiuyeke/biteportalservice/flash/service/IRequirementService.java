@@ -1,6 +1,6 @@
 package com.bitejiuyeke.biteportalservice.flash.service;
 
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.RequirementDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RequirementDTO;
 
 /**
  *

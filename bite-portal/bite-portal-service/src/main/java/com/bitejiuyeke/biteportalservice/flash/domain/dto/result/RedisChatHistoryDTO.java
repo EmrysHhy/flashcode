@@ -1,11 +1,11 @@
-package com.bitejiuyeke.biteportalservice.flash.domain.dto;
+package com.bitejiuyeke.biteportalservice.flash.domain.dto.result;
 
 import lombok.Data;
 
 /**
  *
  * @author Emrys
- * content:
+ * content: Redis聊天历史记录DTO
  */
 @Data
 public class RedisChatHistoryDTO {

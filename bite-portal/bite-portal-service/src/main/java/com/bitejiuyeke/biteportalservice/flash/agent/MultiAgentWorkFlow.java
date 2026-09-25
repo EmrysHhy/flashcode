@@ -17,7 +17,7 @@ import com.bitejiuyeke.biteportalservice.flash.agent.node.BuildPreviewNode;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.CommitNode;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.ErrorFixAgent;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
