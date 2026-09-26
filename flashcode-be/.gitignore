@@ -1,0 +1,105 @@
+# Maven build output (all modules)
+**/target/
+target/
+!.mvn/wrapper/maven-wrapper.jar
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar.bak
+
+# Kotlin
+.kotlin
+
+# Compiled / packaged
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# Generated app output (portal writes here)
+user-code/
+user-preview/
+**/user-code/
+**/user-preview/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+.npm/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker / local runtime data
+**/data/flashcodedata/
+**/data2/flashcodedata/
+
+# Logs
+*.log
+logs/
+*.log.gz
+
+# Local / temp
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.tmp_*
+
+# Env / secrets (keep deploy certs tracked)
+.env
+.env.*
+!.env.example
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# VS Code / AI tools
+.vscode/
+.claude/
+.cursor/
+.opencode/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

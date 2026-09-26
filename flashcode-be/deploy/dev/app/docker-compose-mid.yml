@@ -1,0 +1,262 @@
+#启动命令 docker compose -p flashcode -f docker-compose-mid.yml up -d
+services:
+  flashcode-mysql:
+    container_name: flashcode-mysql
+    image: mysql:8.4.2
+    ports:
+      - "3306:3306"
+    volumes:
+      # 数据挂载
+      - ../data/flashcodedata/mysql/data:/var/lib/mysql
+      # 配置挂载
+      - ./mysql/init/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysql/sql:/opt/sql
+    command: [
+      'mysqld',
+      '--innodb-buffer-pool-size=80M',
+      '--character-set-server=utf8mb4',
+      '--collation-server=utf8mb4_unicode_ci',
+      '--default-time-zone=+8:00',
+      '--lower-case-table-names=1',
+      '--explicit_defaults_for_timestamp=true',
+      '--server-id=1',
+      '--log-bin=mysql-bin',
+      '--binlog-ignore-db=mysql',
+      '--binlog-cache-size=256M',
+      '--binlog-format=ROW',
+      '--max_connections=2000'
+    ]
+    restart: always
+    networks:
+      - flashcode_network
+    healthcheck:
+      test: mysql --user=bitedev -h127.0.0.1 --password='bite@123' -e "SELECT 1;"
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: bite@123
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+  flashcode-nacos:
+    container_name: flashcode-nacos
+    image: nacos/nacos-server:v2.2.2
+    environment:
+      - MODE=standalone
+      - JVM_XMS=512m
+      - JVM_XMX=512m
+      - JVM_XMN=256m
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=flashcode-mysql
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_DB_NAME=flashcode_nacos_dev
+      - MYSQL_SERVICE_USER=bitedev
+      - MYSQL_SERVICE_PASSWORD=bite@123
+    volumes:
+      - ../data/flashcodedata/nacos/logs/:/home/nacos/logs
+      - ../data/flashcodedata/nacos/tomcatlogs/:/home/bit/nacos/tomcat/logs/
+      - ./nacos/conf/application.properties:/home/nacos/conf/application.properties
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    restart: always
+    networks:
+      - flashcode_network
+    depends_on:
+      flashcode-mysql:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8848/nacos" ]
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 10
+  flashcode-redis:
+    container_name: flashcode-redis
+    image: redis:7.0.15
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/conf/redis.conf:/usr/local/etc/redis/redis.conf
+      - ../data/flashcodedata/redis/data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: always
+    networks:
+      - flashcode_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  flashcode-rabbitmq:
+    image: rabbitmq:3.12.6-management
+    container_name: flashcode-rabbitmq
+    restart: always
+    hostname: flashcode-rabbitmq
+    environment:
+      # 用户名
+      RABBITMQ_DEFAULT_USER: admin
+      # 密码
+      RABBITMQ_DEFAULT_PASS: bite@123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ../data/flashcodedata/rabbitmq/log:/var/log/rabbitmq
+      - ../data/flashcodedata/rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - flashcode_network
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+  flashcode-userapp-preview:
+    container_name: flashcode-userapp-preview
+    image: flashcode/userapp
+    build:
+      context: .
+      dockerfile: ./require-image/preview/Dockerfile
+    volumes:
+      - ../data/flashcodedata/flashcode-app/user-preview:/workspace/user-preview
+      - ./require-image/preview/nginx/script:/workspace/scripts
+      - ./require-image/preview/nginx/config/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    restart: always
+    networks:
+      - flashcode_network
+
+
+    # 在同一台主机上，服务之间的依赖关系可以通过 depends_on 来指定。
+    depends_on:
+      flashcode-mysql:
+        condition: service_healthy
+      flashcode-nacos:
+        condition: service_healthy
+      flashcode-redis:
+        condition: service_healthy
+      flashcode-rabbitmq:
+        condition: service_healthy
+
+  flashcode-milvus-etcd:
+    container_name: flashcode-milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+      # VirtualBox 上默认 100ms heartbeat 容易误判节点掉线
+      - ETCD_HEARTBEAT_INTERVAL=500
+      - ETCD_ELECTION_TIMEOUT=5000
+    volumes:
+      - ../data/flashcodedata/milvus/etcd:/etcd
+    command: etcd -advertise-client-urls=http://flashcode-milvus-etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - flashcode_network
+    restart: always
+
+  flashcode-milvus-minio:
+    container_name: flashcode-milvus-minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    restart: always
+    volumes:
+      - ../data/flashcodedata/milvus/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      start_period: 60s
+      timeout: 40s
+      retries: 5
+    networks:
+      - flashcode_network
+
+  flashcode-milvus-standalone:
+    container_name: flashcode-milvus-standalone
+    image: milvusdb/milvus:v2.6.4
+    user: root
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    shm_size: 1g
+    environment:
+      MINIO_REGION: us-east-1
+      ETCD_ENDPOINTS: flashcode-milvus-etcd:2379
+      MINIO_ADDRESS: flashcode-milvus-minio:9000
+      # 2.6 standalone 默认仍带 streaming；lease 一丢就整容器退出。
+      # rocksmq 走本地 WAL，这台 8G 虚拟机上稳得多。
+      MQ_TYPE: rocksmq
+      COMMON_SESSION_TTL: 300
+    volumes:
+      - ../data/flashcodedata/milvus/data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 180s
+      timeout: 20s
+      retries: 10
+    ports:
+      # Bind IPv4 only. Bare "19530:19530" also maps [::]:19530; VirtualBox
+      # docker-proxy often hangs on that IPv6 bind and leaves a stale process,
+      # so the next start fails with userland-proxy timeout / exit 80.
+      - "0.0.0.0:19530:19530"
+      - "0.0.0.0:9091:9091"
+    restart: always
+    networks:
+      - flashcode_network
+    depends_on:
+      flashcode-milvus-etcd:
+        condition: service_healthy
+      flashcode-milvus-minio:
+        condition: service_healthy
+
+  flashcode-attu:
+    container_name: flashcode-attu
+    image: zilliz/attu:v2.6
+    environment:
+      MILVUS_URL: flashcode-milvus-standalone:19530
+    ports:
+      - "3000:3000"
+    restart: always
+    networks:
+      - flashcode_network
+    depends_on:
+      flashcode-milvus-standalone:
+        condition: service_healthy
+  flashcode-web:
+    image: nginx:1.24.0
+    container_name: flashcode-web
+    restart: always
+    networks:
+      - flashcode_network
+    ports:
+      - "19080:19080"
+    volumes:
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/web/dist:/data/flashcode/web/dist
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+networks:
+  flashcode_network:
