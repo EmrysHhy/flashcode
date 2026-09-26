@@ -1,5 +1,0 @@
-*
-!Dockerfile
-!target
-target/*
-!target/*.jar

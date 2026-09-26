@@ -1,3 +1,0 @@
-com.bitejiuyeke.bitecommonredis.config.RedisConfig
-com.bitejiuyeke.bitecommonredis.service.RedisService
-com.bitejiuyeke.bitecommonredis.service.RedissonLockService
