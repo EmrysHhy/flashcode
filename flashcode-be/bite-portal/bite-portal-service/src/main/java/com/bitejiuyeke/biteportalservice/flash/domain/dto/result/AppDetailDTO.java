@@ -20,6 +20,8 @@ public class AppDetailDTO {
 
     private String previewUrl;
 
+    private String appDoc;
+
     public AppDetailVO convertToVO() {
         AppDetailVO appDetailVO = new AppDetailVO();
         BeanCopyUtil.copyProperties(this, appDetailVO);

@@ -10,6 +10,8 @@ import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
+import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
+import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.AppGenerationAgent;
 import com.bitejiuyeke.biteportalservice.flash.agent.node.AppScreenshotNode;
@@ -74,6 +76,7 @@ public class MultiAgentWorkFlow {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AppMapper appMapper;
+    private final TokenService tokenService;
     private final IGiteeService giteeService;
     private final FileFeignClient fileFeignClient;
     private final DockerClient dockerClient;
@@ -93,6 +96,7 @@ public class MultiAgentWorkFlow {
     public MultiAgentWorkFlow(ChatClient chatClient,
                               VectorStore vectorStore,
                               AppMapper appMapper,
+                              TokenService tokenService,
                               IGiteeService giteeService,
                               FileFeignClient fileFeignClient,
                               DockerClient dockerClient,
@@ -102,6 +106,7 @@ public class MultiAgentWorkFlow {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
+        this.tokenService = tokenService;
         this.giteeService = giteeService;
         this.fileFeignClient = fileFeignClient;
         this.dockerClient = dockerClient;
@@ -126,7 +131,12 @@ public class MultiAgentWorkFlow {
         if (appId == null || requirement == null || requirement.isBlank()) {
             throw new ServiceException("appId 和需求文档不能为空");
         }
-        appMapper.insertIfAbsent(appId);
+        LoginUserDTO loginUser = tokenService.getLoginUser();
+        Long ownerId = loginUser == null ? null : loginUser.getUserId();
+        appMapper.insertIfAbsent(appId, ownerId);
+        if (ownerId != null) {
+            appMapper.bindOwnerIfPlaceholder(appId, ownerId);
+        }
         Map<String, Object> input = new HashMap<>();
         input.put(FlashcodeConstant.APP_ID, appId);
         input.put(FlashcodeConstant.REQUIREMENT, requirement);

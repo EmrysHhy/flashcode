@@ -10,6 +10,7 @@ import lombok.Data;
  */
 @Data
 public class SquareListVO {
+    private Long id;
     /**
      * 用户ID
      */

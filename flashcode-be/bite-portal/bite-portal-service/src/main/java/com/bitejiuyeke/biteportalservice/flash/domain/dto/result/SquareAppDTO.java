@@ -9,6 +9,7 @@ import lombok.Data;
  */
 @Data
 public class SquareAppDTO {
+    private Long id;
     /**
      * 用户ID
      */

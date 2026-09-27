@@ -9,6 +9,7 @@ import lombok.Data;
  */
 @Data
 public class MyselfListVO{
+    private Long id;
     /**
      * 用户ID
      */

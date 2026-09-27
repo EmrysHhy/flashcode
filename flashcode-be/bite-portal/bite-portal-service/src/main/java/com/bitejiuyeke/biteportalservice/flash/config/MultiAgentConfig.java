@@ -1,5 +1,6 @@
 package com.bitejiuyeke.biteportalservice.flash.config;
 
+import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
 import com.bitejiuyeke.biteportalservice.flash.agent.MultiAgentWorkFlow;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
@@ -37,6 +38,7 @@ public class MultiAgentConfig {
     public MultiAgentWorkFlow multiAgentWorkFlow(ChatClient chatClient,
                                                  VectorStore vectorStore,
                                                  AppMapper appMapper,
+                                                 TokenService tokenService,
                                                  IGiteeService giteeService,
                                                  FileFeignClient fileFeignClient,
                                                  DockerClient dockerClient,
@@ -44,6 +46,7 @@ public class MultiAgentConfig {
         return new MultiAgentWorkFlow(chatClient,
                 vectorStore,
                 appMapper,
+                tokenService,
                 giteeService,
                 fileFeignClient,
                 dockerClient,

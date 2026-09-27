@@ -38,7 +38,7 @@ public class RequirementServiceImpl implements IRequirementService {
     @Override
     public RequirementDTO generateRequirement(String input) {
         AppDO appDO = new AppDO();
-        appDO.setUserId(999L);
+        appDO.setUserId(tokenService.getLoginUser().getUserId());
         appDO.setAppName("待生成");
         appDO.setAppDesc("待生成");
         appMapper.insert(appDO);
@@ -82,7 +82,6 @@ public class RequirementServiceImpl implements IRequirementService {
      */
     private AppDO buildAppDO(String content) {
         AppDO appDO = new AppDO();
-        appDO.setUserId(tokenService.getLoginUser().getUserId());
         appDO.setAppDoc(content);
         Pattern appNamePattern = Pattern.compile(
                 "##\\s*1\\.\\s*应用名称\\s*\\r?\\n(.*?)(?=\\r?\\n\\s*##\\s*2\\.\\s*应用描述)",

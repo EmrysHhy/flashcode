@@ -67,7 +67,12 @@ public class AppServiceImpl implements IAppService {
      */
     @Override
     public GenerateAppDTO appGenerate(Long appId, String requirement) {
-        appMapper.insertIfAbsent(appId);
+        LoginUserDTO loginUser = tokenService.getLoginUser();
+        Long ownerId = loginUser == null ? null : loginUser.getUserId();
+        appMapper.insertIfAbsent(appId, ownerId);
+        if (ownerId != null) {
+            appMapper.bindOwnerIfPlaceholder(appId, ownerId);
+        }
         //生成代码
         String appCode = ChatContentSupport.collect(chatClient.prompt()
                 .system(getSysPrompt(appId))
@@ -136,6 +141,7 @@ public class AppServiceImpl implements IAppService {
         appDetailDTO.setAppName(app.getAppName());
         appDetailDTO.setAppType(app.getAppType());
         appDetailDTO.setPreviewUrl(app.getAppPreviewUrl());
+        appDetailDTO.setAppDoc(app.getAppDoc());
         return appDetailDTO;
     }
 

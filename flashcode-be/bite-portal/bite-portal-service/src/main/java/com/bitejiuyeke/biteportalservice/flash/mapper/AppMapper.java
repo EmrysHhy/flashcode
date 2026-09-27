@@ -25,9 +25,13 @@ public interface AppMapper extends BaseMapper<AppDO> {
     @Update("UPDATE app SET app_type = #{appType} WHERE id = #{appId}")
     int updateTypeById(@Param("appId") Long appId, @Param("appType") Integer appType);
 
-    /** 生成接口允许直接带 appId；需求文档没插过行时补一条，避免构建完 UPDATE 0 行。 */
-    @Insert("INSERT IGNORE INTO app (id, user_id, app_name, app_desc) VALUES (#{appId}, 999, '待生成', '待生成')")
-    int insertIfAbsent(@Param("appId") Long appId);
+    /** 需求文档没插过行时补一条，避免构建完 UPDATE 0 行。 */
+    @Insert("INSERT IGNORE INTO app (id, user_id, app_name, app_desc) VALUES (#{appId}, #{userId}, '待生成', '待生成')")
+    int insertIfAbsent(@Param("appId") Long appId, @Param("userId") Long userId);
+
+    /** 历史数据把作者写成了占位用户 999，当前登录用户继续生成时改回本人。 */
+    @Update("UPDATE app SET user_id = #{userId} WHERE id = #{appId} AND user_id = 999")
+    int bindOwnerIfPlaceholder(@Param("appId") Long appId, @Param("userId") Long userId);
     /**
      * 分页查询某个用户的应用。appType 为空时不按类型过滤。
      */

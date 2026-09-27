@@ -17,4 +17,6 @@ public class AppDetailVO {
     private Integer appType;
 
     private String previewUrl;
+
+    private String appDoc;
 }

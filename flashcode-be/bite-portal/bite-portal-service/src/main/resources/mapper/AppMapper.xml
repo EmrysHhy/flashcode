@@ -29,7 +29,8 @@
     </select>
 
     <select id="selectSquareApp" resultType="com.bitejiuyeke.biteportalservice.flash.domain.dto.result.SquareAppDTO">
-        SELECT a.user_id,
+        SELECT a.id,
+               a.user_id,
                u.nick_name AS user_name,
                a.app_type,
                a.app_name,

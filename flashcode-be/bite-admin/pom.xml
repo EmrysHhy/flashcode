@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.bitejiuyeke</groupId>
-        <artifactId>flashcode</artifactId>
+        <artifactId>flashcode-be</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
 

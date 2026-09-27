@@ -8,6 +8,7 @@ import com.bitejiuyeke.biteportalservice.user.domain.dto.WechatLoginDTO;
 import com.bitejiuyeke.biteportalservice.user.domain.vo.UserVo;
 import com.bitejiuyeke.biteportalservice.user.service.ILoginUserService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -37,11 +38,15 @@ public class UserController {
      * 发送验证码（手机号或邮箱）
      *
      * @param account 手机号或邮箱
+     * @param email   邮箱，与 account 二选一
      * @return 验证码
      */
     @GetMapping("/send_code")
-    public R<String> sendCode(String account) {
-        return R.ok(userService.sendCode(account));
+    public R<String> sendCode(@RequestParam(value = "account", required = false) String account,
+                              @RequestParam(value = "email", required = false) String email) {
+        String target = StringUtils.isNotBlank(account) ? account : email;
+        log.info("发送验证码，account={}", target);
+        return R.ok(userService.sendCode(target));
     }
 
     /**
