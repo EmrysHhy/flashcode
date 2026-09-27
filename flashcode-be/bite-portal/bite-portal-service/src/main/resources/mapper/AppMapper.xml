@@ -9,7 +9,7 @@
             resultType="com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO">
         SELECT id, user_id, app_name, app_desc, app_type, app_screenshot
         FROM app
-        WHERE id = #{appId}
+        WHERE user_id = #{userId}
         <if test="appType != null">
             AND app_type = #{appType}
         </if>
@@ -22,7 +22,7 @@
             resultType="java.lang.Long">
         SELECT COUNT(1)
         FROM app
-        WHERE id = #{appId}
+        WHERE user_id = #{userId}
         <if test="appType != null">
             AND app_type = #{appType}
         </if>

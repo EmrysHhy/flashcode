@@ -1,6 +1,9 @@
 package com.bitejiuyeke.biteportalservice.flash.service.implement;
 
 import com.bitejiuyeke.bitecommoncore.domain.dto.BasePageDTO;
+import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
+import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
+import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.ChatHistoryReqParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.MyselfListReqParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.SquareListReqParam;
@@ -33,6 +36,8 @@ public class AppPageServiceImpl implements IAppPageService {
     AppUserMapper userMapper;
     @Autowired
     ChatHistoryMapper chatHistoryMapper;
+    @Autowired
+    TokenService tokenService;
     @Override
     public BasePageDTO<SquareAppDTO> getSquare(SquareListReqParam squareListDTO) {
         Integer deployed = DeployStatusEnum.DEPLOYED.getValue();
@@ -76,6 +81,11 @@ public class AppPageServiceImpl implements IAppPageService {
 
     @Override
     public BasePageDTO<MyselfAppDTO> getMyself(MyselfListReqParam myselfListDTO) {
+        LoginUserDTO loginUser = tokenService.getLoginUser();
+        if (loginUser == null || loginUser.getUserId() == null) {
+            throw new ServiceException("请先登录");
+        }
+        myselfListDTO.setUserId(loginUser.getUserId());
         Long totals = appMapper.countMyselfApp(myselfListDTO);
         BasePageDTO<MyselfAppDTO> page = new BasePageDTO<>();
         page.setTotals(totals.intValue());

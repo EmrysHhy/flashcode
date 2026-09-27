@@ -82,6 +82,9 @@ mybatis-plus:
             - Path=/portal/**
           filters:
             - StripPrefix=1
+          metadata:
+            response-timeout: 600000
+            connect-timeout: 600000
         # 鉴权模块
         - id: bite-admin
           uri: lb://bite-admin

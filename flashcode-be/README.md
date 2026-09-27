@@ -31,3 +31,8 @@ docker exec flashcode-userapp-preview tail -n 50 /workspace/user-preview/1000000
 
 
 Gitee私人令牌:9cf1b2893c9c24dd197b96195f419aad
+
+
+# mvn 指令
+mvn deploy -pl bite-portal/bite-portal-service -am -DskipTests
+mvn clean deploy -pl bite-portal/bite-portal-service -am -DskipTests
