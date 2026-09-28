@@ -1,15 +1,20 @@
 package com.bitejiuyeke.biteportalservice.flash.controller;
 
 import com.bitejiuyeke.bitecommondomain.domain.R;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppEditParam;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.GetSrcParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GetSrcDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.AppDetailVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
+import com.bitejiuyeke.biteportalservice.flash.domain.vo.GetSrcVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;
 import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -17,11 +22,9 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
 
 /**
  *
@@ -69,5 +72,20 @@ public class FlashcodeController {
         log.info("收到查询应用详情请求，appId：{}", appId);
         AppDetailDTO appDetailDTO = appService.getAppDetail(appId);
         return R.ok(appDetailDTO.convertToVO());
+    }
+    @PostMapping("/edit")
+    public R<GenerateAppVO> appEdit(@RequestBody @Validated AppEditParam appEditDTO){
+        GenerateAppDTO generateAppDTO = appService.appEdit(appEditDTO);
+        return R.ok(generateAppDTO.convertToVO());
+    }
+    @PostMapping("/getsrc")
+    public R<String> getSrc(@RequestParam Long appId){
+        String srcUrl = appService.getSrc(appId);
+        return R.ok(srcUrl);
+    }
+    @PostMapping("/advanced_edit")
+    public R<GenerateAppVO> appAdvancedEdit(@RequestParam @NotNull Long appId){
+        GenerateAppDTO generateAppDTO = appService.appAdvancedEdit(appId);
+        return R.ok(generateAppDTO.convertToVO());
     }
 }

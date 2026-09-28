@@ -30,6 +30,13 @@ public class FileWriterUtil {
 
     /**
      * 从已落盘的源码目录读回文本文件。构建产物不读。
+     */
+    public static Map<String, String> readSourceFiles(Path codePath) {
+        return readSourceFiles(codePath == null ? null : codePath.toString());
+    }
+
+    /**
+     * 从已落盘的源码目录读回文本文件。构建产物不读。
      * 图状态里的 FILES 经常丢（嵌套 Map 被展平或类型对不上），磁盘才是准的。
      */
     public static Map<String, String> readSourceFiles(String codePath) {
@@ -54,7 +61,7 @@ public class FileWriterUtil {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (attrs.size() > 512 * 1024) {
+                    if (!isCodeFile(file) || attrs.size() > 512 * 1024) {
                         return FileVisitResult.CONTINUE;
                     }
                     String relative = root.relativize(file).toString().replace('\\', '/');
@@ -72,6 +79,22 @@ public class FileWriterUtil {
         }
         log.info("从磁盘读回源码, dir={}, fileCount={}", root, files.size());
         return files;
+    }
+
+    private static boolean isCodeFile(Path path) {
+        Path name = path.getFileName();
+        if (name == null) {
+            return false;
+        }
+        String fileName = name.toString().toLowerCase();
+        return fileName.endsWith(".html")
+                || fileName.endsWith(".vue")
+                || fileName.endsWith(".js")
+                || fileName.endsWith(".ts")
+                || fileName.endsWith(".css")
+                || fileName.endsWith(".java")
+                || fileName.endsWith(".json")
+                || fileName.endsWith(".xml");
     }
 
     /**

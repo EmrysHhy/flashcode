@@ -4,12 +4,19 @@ import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
 import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppAdvancedEditParam;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppEditParam;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.GetSrcParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
+import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GetSrcDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
+import com.bitejiuyeke.biteportalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.biteportalservice.flash.enums.DeployStatusEnum;
+import com.bitejiuyeke.biteportalservice.flash.enums.Role;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
+import com.bitejiuyeke.biteportalservice.flash.mapper.ChatHistoryMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.AnalysisUtil;
@@ -27,7 +34,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -45,6 +54,8 @@ public class AppServiceImpl implements IAppService {
     ChatClient chatClient;
     @Autowired
     AppMapper appMapper;
+    @Autowired
+    ChatHistoryMapper chatHistoryMapper;
     @Autowired
     TokenService tokenService;
     @Autowired
@@ -146,6 +157,198 @@ public class AppServiceImpl implements IAppService {
     }
 
     /**
+     * 修改应用代码
+     * @param appEditParam
+     * @return
+     */
+    @Override
+    public GenerateAppDTO appEdit(AppEditParam appEditParam) {
+        Long appId = appEditParam.getAppId();
+        AppDO app = appMapper.selectById(appId);
+        if (app == null) {
+            throw new ServiceException("应用不存在");
+        }
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!Files.isDirectory(appDir)) {
+            log.info("本地源码不存在，从 Gitee 拉取, appId={}, dir={}", appId, appDir);
+            giteeService.pull(appId);
+        }
+        Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
+        String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(), appEditParam.getNewContent());
+        String editAppSysPrompt = getEditAppSysPrompt(appEditParam.getElementSelector(), appEditParam.getNewContent());
+        //获得大模型修改之后的代码
+        // 不写入会话记忆。用户提示词里带了全部源码，chat_history.content 装不下，下一轮也会把源码再喂给模型
+        String appCode = ChatContentSupport.collect(chatClient.prompt()
+                .system(editAppSysPrompt)
+                .user(editAppUserPrompt)
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().build())
+                        .build()));
+        log.info("修改应用代码完成，appId: {}, appCode: {}", appId, appCode);
+
+        Map<String, String> editedFiles = AnalysisUtil.getFiles(appCode);
+        if (editedFiles.isEmpty()) {
+            throw new ServiceException("未解析到修改后的代码");
+        }
+        codes.putAll(editedFiles);
+        AppTypesEnum appType = AnalysisUtil.resolveType(appCode, codes);
+        //更新数据库类型 updateType(appId, appType)
+        int updated = appMapper.updateTypeById(appId, appType.getValue());
+        if (updated <= 0) {
+            throw new ServiceException("更新应用类型失败，app 不存在, appId=" + appId + ", appType=" + appType.getValue());
+        }
+        //本地代码保存。模型只回修改过的文件，其余源码仍留在 codes 里
+        Path codePath = FileWriterUtil.saveCode(appId, codes);
+        // 源码推到 Gitee flash-user-code/{appId}/，后续删本地后可再 pull
+        giteeService.push(appId, codes);
+        // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
+        // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
+        packageCode(appType, codePath, appId);
+        // 3. 得到URL预览地址
+        String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
+        // 4. 更新数据库中的预览地址
+        updated = appMapper.updateUrlById(appId, url);
+        if(updated <= 0){
+            log.error("更新预览地址失败，appId: {}, url: {}", appId, url);
+            throw new ServiceException("更新预览地址失败");
+        }
+        //创建定时器,在多久以后将本地代码删除
+        // 单独一个调度器（1～2 个线程就够）
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.schedule(
+                () -> threadPoolTaskExecutor.execute(() -> FileWriterUtil.deleteCodeByAppId(appId)),
+                deleteCodeExpire, TimeUnit.HOURS
+        );
+        saveEditChat(appId, appEditParam.getElementSelector(), appEditParam.getNewContent());
+
+        //返回DTO
+        GenerateAppDTO generateAppDTO = new GenerateAppDTO();
+        generateAppDTO.setAppId(appId);
+        generateAppDTO.setAppType(appType);
+        generateAppDTO.setUrl(url);
+        return generateAppDTO;
+    }
+    /**
+     * 获取应用源代码
+     * @param appId
+     * @return
+     */
+    @Override
+    public String getSrc(Long appId) {
+        return null;
+    }
+    /**
+     * 高级编辑功能
+     * @param appId
+     * @return
+     */
+    @Override
+    public GenerateAppDTO appAdvancedEdit(Long appId) {
+        return null;
+    }
+
+
+    private void saveEditChat(Long appId, String elementSelector, String newContent) {
+        ChatHistoryDO userMessage = new ChatHistoryDO();
+        userMessage.setAppId(appId);
+        userMessage.setChatRole(Role.USER.getValue());
+        userMessage.setContent("修改元素 " + elementSelector + "：" + newContent);
+        chatHistoryMapper.insert(userMessage);
+
+        ChatHistoryDO assistantMessage = new ChatHistoryDO();
+        assistantMessage.setAppId(appId);
+        assistantMessage.setChatRole(Role.LLM.getValue());
+        assistantMessage.setContent("应用修改成功");
+        chatHistoryMapper.insert(assistantMessage);
+    }
+
+    /**
+     * 获取编辑应用的用户提示词
+     * @param codes
+     * @param elementSelector
+     * @param newContent
+     * @return
+     */
+    private String getEditAppUserPrompt(Map<String, String> codes, String elementSelector, String newContent) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("【精确修改请求】\n\n");
+        prompt.append("目标 CSS 选择器（已精确定位，无需分析）：\n");
+        prompt.append(elementSelector).append("\n\n");
+        prompt.append("修改类型：样式修改（仅作用于该元素）\n");
+        prompt.append("具体要求：").append(newContent).append("\n\n");
+        if (elementSelector != null && elementSelector.contains(":nth-child(")) {
+            prompt.append("⚠ 注意：该选择器包含 nth-child，表示这是列表中的一个单独元素。\n");
+            prompt.append("你必须确保其他列表项在任何方面都不发生变化。\n");
+        }
+        prompt.append("以下是完整代码文件，请只对目标元素进行最小必要修改：\n\n");
+        if (codes != null) {
+            for (Map.Entry<String, String> entry : codes.entrySet()) {
+                prompt.append("FILE: ").append(entry.getKey()).append("\n");
+                prompt.append("```html\n");
+                prompt.append(entry.getValue() == null ? "" : entry.getValue());
+                prompt.append("\n```\n\n");
+            }
+        }
+        return prompt.toString();
+    }
+
+    /**
+     * 编辑代码系统提示词
+     */
+    private String getEditAppSysPrompt(String elementSelector, String newContent) {
+        return String.join("\n",
+                "你是一个“精确 DOM 定点修改器”，不是代码重构器。",
+                "你的唯一任务：只修改一个已经被精确定位的 DOM 元素，其余任何内容都禁止改动。",
+                "",
+                "====================",
+                "【目标元素（已由系统精确定位）】",
+                "CSS 选择器：",
+                elementSelector == null ? "" : elementSelector,
+                "",
+                "该选择器唯一且只指向一个确定的 DOM 元素。",
+                "你【不需要】也【不允许】重新理解、简化或泛化该选择器。",
+                "",
+                "====================",
+                "【硬性修改规则（不可违反）】",
+                "1. 只允许修改该选择器命中的“单一元素”。",
+                "2. 禁止修改任何兄弟元素、父元素或子元素。",
+                "3. 禁止新增、删除、重排任何 DOM 结构。",
+                "4. 禁止修改任何全局 CSS、公共 class 或选择器。",
+                "",
+                "====================",
+                "【nth-child 特别规则（最高优先级）】",
+                "当前选择器包含 :nth-child(n)，这表示：",
+                "- 只允许影响该列表中的第 n 个元素；",
+                "- 其他列表项必须在结构、样式、文本上保持 100% 不变。",
+                "",
+                "当修改涉及颜色、字体、背景、样式时：",
+                "✓ 强制优先使用该元素的内联 style；",
+                "✓ 或仅对该完整选择器生效的样式；",
+                "✗ 绝对禁止修改公共 class（例如 .teacher-name）。",
+                "",
+                "====================",
+                "【修改指令】",
+                newContent == null ? "" : newContent,
+                "",
+                "====================",
+                "【输出要求】",
+                "- 只输出被修改的文件；",
+                "- 文件内容必须是修改后的完整内容；",
+                "- 除目标元素外，其他任何字符都不得变化；",
+                "- 不要输出解释、注释或多余文本。",
+                "- 文件内容：紧接着按以下格式输出每个文件：",
+                "FILE: <relative_path>",
+                "```<language>",
+                "<complete_file_content>",
+                "```",
+                "  - `<relative_path>`：文件的相对路径，路径中省略appId（如 `index.html`，`frontend/src/App.vue`，`backend/src/main/resources/application.properties`）。",
+                "  - `<complete_file_content>`：**完整**的文件内容，**绝对禁止**省略、使用占位符或 `// ...`。"
+        );
+    }
+
+    /**
      * 打包代码并且保存到目录下
      *
      * @param appType  应用类型
@@ -193,7 +396,7 @@ public class AppServiceImpl implements IAppService {
 
     /**
      * 进一步封装用户提示词
-     *
+     * 生成应用
      * @param requirement
      * @return
      */
@@ -205,11 +408,9 @@ public class AppServiceImpl implements IAppService {
         );
     }
 
-
-
-
     /**
      * 系统提示词
+     * 生成应用
      */
     private String getSysPrompt(Long appId) {
         return String.join("\n",

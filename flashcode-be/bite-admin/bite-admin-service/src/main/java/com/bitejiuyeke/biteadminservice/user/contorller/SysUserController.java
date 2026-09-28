@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * B端用户服务控制器类
  */
 @RestController
-@RequestMapping("/sys_user")
+@RequestMapping("/sys_user1")
 public class SysUserController {
 
     @Autowired

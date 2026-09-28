@@ -19,7 +19,7 @@ CREATE TABLE `chat_history` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '聊天历史记录自增id',
   `app_id` bigint NOT NULL COMMENT '所属应用主键ID',
   `chat_role` tinyint(1) NOT NULL COMMENT '用户角色：0=用户, 1=大模型',
-  `content` text NOT NULL COMMENT '聊天历史记录',
+  `content` mediumtext NOT NULL COMMENT '聊天历史记录',
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已删除：0=未删除, 1=已删除',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '新增时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更改时间',

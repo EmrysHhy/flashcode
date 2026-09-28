@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * C端用户相关接口实现
  */
 @RestController
-@RequestMapping("/app_user")
+@RequestMapping("/app_user1")
 public class AppUserController implements AppUserFeignClient {
 
     @Autowired
