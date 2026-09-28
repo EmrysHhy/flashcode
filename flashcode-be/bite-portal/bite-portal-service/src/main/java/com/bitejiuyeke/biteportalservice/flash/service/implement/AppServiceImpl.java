@@ -247,7 +247,7 @@ public class AppServiceImpl implements IAppService {
             log.info("本地源码不存在，从 Gitee 拉取, appId={}, dir={}", appId, appDir);
             giteeService.pull(appId);
         }
-        return vscodeHost + ":" + vscodeport + "/?folder=/workspace/user-code/" + appId;
+        return "http://" + vscodeHost + ":" + vscodeport + "/?folder=/workspace/user-code/" + appId;
     }
     /**
      * 高级编辑功能
