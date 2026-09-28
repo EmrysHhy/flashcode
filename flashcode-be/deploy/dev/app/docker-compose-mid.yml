@@ -258,5 +258,19 @@ services:
       nofile:
         soft: 20000
         hard: 40000
+  flashcode-vscode:
+    container_name: flashcode-vscode
+    image: codercom/code-server:4.99.0-39
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../data/flashcodedata/userapp/user-code/user-code:/home/workspace
+    working_dir: /home/workspace
+    environment:
+      - PWD=/home/workspace
+    command: --auth none --bind-addr 0.0.0.0:8080
+    restart: always
+    networks:
+      - flashcode_network
 networks:
   flashcode_network:

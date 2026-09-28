@@ -2,14 +2,11 @@ package com.bitejiuyeke.biteportalservice.flash.controller;
 
 import com.bitejiuyeke.bitecommondomain.domain.R;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppEditParam;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.GetSrcParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GetSrcDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.RequirementDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.AppDetailVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.GenerateAppVO;
-import com.bitejiuyeke.biteportalservice.flash.domain.vo.GetSrcVO;
 import com.bitejiuyeke.biteportalservice.flash.domain.vo.RequirementVO;
 import com.bitejiuyeke.biteportalservice.flash.service.IAppService;
 import com.bitejiuyeke.biteportalservice.flash.service.IRequirementService;

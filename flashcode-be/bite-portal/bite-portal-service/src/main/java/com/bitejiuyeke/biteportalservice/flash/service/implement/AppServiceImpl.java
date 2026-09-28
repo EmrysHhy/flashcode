@@ -67,8 +67,11 @@ public class AppServiceImpl implements IAppService {
     @Autowired
     Executor threadPoolTaskExecutor;
     @Value("${flashcode.delete-code-expire:12}")
-    Integer deleteCodeExpire;
-
+    private Integer deleteCodeExpire;
+    @Value("${vscode.host:192.168.56.107}")
+    private String vscodeHost;
+    @Value("${vscode.port:8080}")
+    private String vscodeport;
     /**
      * app应用生成
      *
@@ -237,7 +240,14 @@ public class AppServiceImpl implements IAppService {
      */
     @Override
     public String getSrc(Long appId) {
-        return null;
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!Files.isDirectory(appDir)) {
+            log.info("本地源码不存在，从 Gitee 拉取, appId={}, dir={}", appId, appDir);
+            giteeService.pull(appId);
+        }
+        return vscodeHost + ":" + vscodeport + "/?folder=/workspace/user-code/" + appId;
     }
     /**
      * 高级编辑功能
@@ -246,7 +256,38 @@ public class AppServiceImpl implements IAppService {
      */
     @Override
     public GenerateAppDTO appAdvancedEdit(Long appId) {
-        return null;
+        // 再次检查一遍,防止用户太久没有上线,本地代码已经删除了
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!Files.isDirectory(appDir)) {
+            log.info("本地源码不存在，从 Gitee 拉取, appId={}, dir={}", appId, appDir);
+            giteeService.pull(appId);
+        }
+        Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
+        AppTypesEnum appType = AppTypesEnum.of(String.valueOf(appMapper.selectTpyeById(appId)));
+        //本地代码保存。模型只回修改过的文件，其余源码仍留在 codes 里
+        Path codePath = FileWriterUtil.saveCode(appId, codes);
+        // 源码推到 Gitee flash-user-code/{appId}/，后续删本地后可再 pull
+        giteeService.push(appId, codes);
+        // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
+        // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
+        packageCode(appType, codePath, appId);
+        // 3. 得到URL预览地址
+        String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
+        //创建定时器,在多久以后将本地代码删除
+        // 单独一个调度器（1～2 个线程就够）
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.schedule(
+                () -> threadPoolTaskExecutor.execute(() -> FileWriterUtil.deleteCodeByAppId(appId)),
+                deleteCodeExpire, TimeUnit.HOURS
+        );
+        //返回DTO
+        GenerateAppDTO generateAppDTO = new GenerateAppDTO();
+        generateAppDTO.setAppId(appId);
+        generateAppDTO.setAppType(appType);
+        generateAppDTO.setUrl(url);
+        return generateAppDTO;
     }
 
 

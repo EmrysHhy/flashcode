@@ -47,6 +47,8 @@ public enum AppTypesEnum {
         return Html;
     }
 
+    
+
     /**
      * 提示词中的 APP_TYPE 示例，与解析器使用同一套枚举名
      */
@@ -55,4 +57,5 @@ public enum AppTypesEnum {
                 .map(item -> "APP_TYPE=" + item.name())
                 .collect(Collectors.joining("、"));
     }
+
 }

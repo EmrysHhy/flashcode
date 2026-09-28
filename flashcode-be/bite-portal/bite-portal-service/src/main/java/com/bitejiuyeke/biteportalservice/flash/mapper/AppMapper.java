@@ -51,4 +51,11 @@ public interface AppMapper extends BaseMapper<AppDO> {
      * 统计已部署应用数量，过滤条件与广场分页查询一致。
      */
     Long countSquareApp(@Param("query") SquareListReqParam query, @Param("deployStatus") Integer deployStatus);
+
+    /**
+     * 查询应用类型
+     * @return
+     */
+    @Select("SELECT DISTINCT app_type FROM app WHERE id = #{appId}")
+    Integer selectTpyeById(Long appId);
 }

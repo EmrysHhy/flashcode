@@ -213,6 +213,7 @@
                             <run>
                                 <volumes>
                                     <bind>
+                                        <volume>/root/emrys-java/flashcode/deploy/dev/data/flashcodedata/flashcode-app/user-code:/workspace/user-code</volume>
                                         <volume>/root/emrys-java/flashcode/deploy/dev/data/flashcodedata/flashcode-app/user-preview:/workspace/user-preview</volume>
                                         <volume>/root/emrys-java/flashcode/deploy/dev/app/config/cert:/workspace/cert:ro</volume>
                                     </bind>
