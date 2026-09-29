@@ -25,8 +25,11 @@ public interface AppMapper extends BaseMapper<AppDO> {
     @Update("UPDATE app SET app_type = #{appType} WHERE id = #{appId}")
     int updateTypeById(@Param("appId") Long appId, @Param("appType") Integer appType);
 
+    @Update("UPDATE app SET deploy_status = 1, app_url = #{appUrl} WHERE id = #{appId}")
+    int updateDeployById(@Param("appId") Long appId, @Param("appUrl") String appUrl);
+
     /** 需求文档没插过行时补一条，避免构建完 UPDATE 0 行。 */
-    @Insert("INSERT IGNORE INTO app (id, user_id, app_name, app_desc) VALUES (#{appId}, #{userId}, '待生成', '待生成')")
+    @Insert("INSERT IGNORE INTO app (id, user_id, app_name, app_desc, deploy_status) VALUES (#{appId}, #{userId}, '待生成', '待生成', 0)")
     int insertIfAbsent(@Param("appId") Long appId, @Param("userId") Long userId);
 
     /** 历史数据把作者写成了占位用户 999，当前登录用户继续生成时改回本人。 */

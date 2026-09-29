@@ -44,8 +44,11 @@ public class AppDO extends BaseDO {
     /**
      * 部署状态：0=未部署，1=已部署
      */
-    private DeployStatusEnum deployStatus;
-
+    private Integer deployStatus = DeployStatusEnum.NOT_DEPLOYED.getValue();
+    /**
+     * 部署之后的url
+     */
+    private String appUrl;
     /**
      * 应用类型：0=html, 1=vue3, 2=vue3_spring
      */

@@ -11,12 +11,12 @@ import com.bitejiuyeke.biteportalservice.flash.utils.CommandUtil;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.CONTAINER_NAME;
 
 /**
  *
@@ -29,6 +29,10 @@ public class BuildPreviewNode implements NodeAction {
     private final DockerClient dockerClient;
 
     private final AppMapper appMapper;
+    @Value("${flashcode.preview.nginx_pre:http://192.168.56.107:80/preview/}")
+    private String NGINX_PRE;
+    @Value("${flashcode.preview.container_name:flashcode-userapp-preview}")
+    private String CONTAINER_NAME;
 
     public BuildPreviewNode(DockerClient dockerClient, AppMapper appMapper) {
         this.dockerClient = dockerClient;
@@ -49,7 +53,8 @@ public class BuildPreviewNode implements NodeAction {
             Path codePath = codePathStr != null ? Path.of(codePathStr) : null;
             Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
             packageCode(appType, codePath, appId);
-            String url = FlashcodeConstant.NGINX_PRE + appId + "/#/";
+            String url = NGINX_PRE + appId + "/#/";
+            //String url = FlashcodeConstant.NGINX_PRE + appId + "/#/";
             int updated = appMapper.updateUrlById(appId, url);
             if (updated <= 0) {
                 throw new BuildStageException(FlashcodeConstant.STAGE_UPDATE_URL, false,

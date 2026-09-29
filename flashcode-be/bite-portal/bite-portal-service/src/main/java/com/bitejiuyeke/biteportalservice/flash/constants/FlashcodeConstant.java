@@ -52,12 +52,6 @@ public class FlashcodeConstant extends CommonConstants {
     /** 用户上传的参考文件，与 generated 代码隔离，避免 saveCode 清空 */
     public static final String USER_REFERENCE_DIR = "user-reference";
     /**
-     * 预览打包
-     */
-
-    public static final String USER_PREVIEW_DIR = "user-preview";
-    public static final String NGINX_PRE = "http://192.168.56.107:80/preview/";   //todo nacos上配置
-    /**
      * 运行命令
      */
     public static final String NPM_REGISTRY = "https://registry.npmmirror.com";
@@ -71,14 +65,19 @@ public class FlashcodeConstant extends CommonConstants {
     /**
      * 预览容器
      */
-    public static final String CONTAINER_NAME = "flashcode-userapp-preview";  //todo nacos上配置
+
+    public static final String USER_PREVIEW_DIR = "user-preview";
+    //public static final String NGINX_PRE = "http://192.168.56.107:80/preview/";   //nacos上配置
+    //public static final String CONTAINER_NAME = "flashcode-userapp-preview";  // nacos上配置
     public static final String PREVIEW_URL = "previewUrl";
     public static final String NGINX_UPDATE_SCRIPT = "/workspace/scripts/update_nginx_location.sh";
     /** 生成应用 Spring Boot 容器内端口 */
-    public static final int JAR_CONTAINER_PORT = 8080;
     public static final int JAR_HOST_PORT_BASE = 8001;
     public static final int JAR_HOST_PORT_RANGE = 1999;
-    public static final String USER_DEVELOP_DIR = "user-develop";
+    /**
+     * 部署
+     */
+    public static final String FLASHCODE_USERAPP = "flashcode-userapp";
     /**
      * redis key
      */

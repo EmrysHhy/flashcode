@@ -85,4 +85,9 @@ public class FlashcodeController {
         GenerateAppDTO generateAppDTO = appService.appAdvancedEdit(appId);
         return R.ok(generateAppDTO.convertToVO());
     }
+    @PostMapping("/app_deploy")
+    public R<String> appDeploy(@RequestParam @NotNull Long appId){
+        return R.ok(appService.appDeploy(appId));
+
+    }
 }

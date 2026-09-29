@@ -4,12 +4,9 @@ import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.bitecommonsecurity.domain.dto.LoginUserDTO;
 import com.bitejiuyeke.bitecommonsecurity.service.TokenService;
 import com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppAdvancedEditParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.AppEditParam;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.GetSrcParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
-import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GetSrcDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.biteportalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.biteportalservice.flash.enums.AppTypesEnum;
@@ -24,6 +21,13 @@ import com.bitejiuyeke.biteportalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.biteportalservice.flash.utils.CommandUtil;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.exception.DockerException;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.PortBinding;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -34,13 +38,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.*;
-
-import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.CONTAINER_NAME;
 
 /**
  *
@@ -72,6 +75,25 @@ public class AppServiceImpl implements IAppService {
     private String vscodeHost;
     @Value("${vscode.port:8080}")
     private String vscodeport;
+    @Value("${flashcode.preview.nginx_pre:http://192.168.56.107:80/preview/}")
+    private String NGINX_PRE;
+    @Value("${flashcode.preview.container_name:flashcode-userapp-preview}")
+    private String PREVIEW_CONTAINER_NAME;
+    @Value("${flashcode.deploy.image:flashcode/user-deploy}")
+    private String deployImage;
+    @Value("${flashcode.deploy.host:http://192.168.56.107}")
+    private String deployHost;
+    @Value("${flashcode.deploy.maxRetries:10}")
+    private Integer deployMaxRetries;
+    @Value("${flashcode.deploy.containerName:flashcode-userapp}")
+    private String deployContainerName;
+    @Value("${flashcode.deploy.nginxPath:/root/emrys-java/flashcode/deploy/dev/app/require-image/deploy/nginx/config/nginx.conf}")
+    private String deployNginxPath;
+    @Value("${flashcode.deploy.deployPath:/root/emrys-java/flashcode/deploy/dev/data/flashcodedata/flashcode-app/user-deploy}")
+    private String deployPath;
+    @Value("${flashcode.deploy.local-dir:/workspace/user-deploy}")
+    private String deployLocalDir;
+
     /**
      * app应用生成
      *
@@ -112,7 +134,7 @@ public class AppServiceImpl implements IAppService {
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
         // 3. 得到URL预览地址
-        String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
+        String url = NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
         // 4. 更新数据库中的预览地址
         updated = appMapper.updateUrlById(appId, url);
         if(updated <= 0){
@@ -136,13 +158,18 @@ public class AppServiceImpl implements IAppService {
         return generateAppDTO;
     }
 
+    /**
+     * 获取应用详情
+     * @param appId
+     * @return
+     */
     @Override
     public AppDetailDTO getAppDetail(Long appId) {
         AppDO app = appMapper.selectById(appId);
         if (app == null) {
             throw new ServiceException("应用不存在");
         }
-        if (app.getDeployStatus() != DeployStatusEnum.DEPLOYED) {
+        if (!Integer.valueOf(DeployStatusEnum.DEPLOYED.getValue()).equals(app.getDeployStatus())) {
             LoginUserDTO loginUser = tokenService.getLoginUser();
             if (loginUser == null || !"app".equals(loginUser.getUserFrom())
                     || !app.getUserId().equals(loginUser.getUserId())) {
@@ -210,7 +237,7 @@ public class AppServiceImpl implements IAppService {
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
         // 3. 得到URL预览地址
-        String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
+        String url = NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
         // 4. 更新数据库中的预览地址
         updated = appMapper.updateUrlById(appId, url);
         if(updated <= 0){
@@ -274,7 +301,7 @@ public class AppServiceImpl implements IAppService {
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
         // 3. 得到URL预览地址
-        String url = FlashcodeConstant.NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
+        String url = NGINX_PRE + appId + "/#/"; //  /workspace/user-preview
         //创建定时器,在多久以后将本地代码删除
         // 单独一个调度器（1～2 个线程就够）
         ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
@@ -288,6 +315,202 @@ public class AppServiceImpl implements IAppService {
         generateAppDTO.setAppType(appType);
         generateAppDTO.setUrl(url);
         return generateAppDTO;
+    }
+
+    /**
+     * 应用公开部署
+     * @param appId
+     * @return
+     */
+    @Override
+    public String appDeploy(Long appId) {
+        AppDO app = appMapper.selectById(appId);
+        if (app == null) {
+            throw new ServiceException("应用不存在");
+        }
+        if (Integer.valueOf(DeployStatusEnum.DEPLOYED.getValue()).equals(app.getDeployStatus())) {
+            throw new ServiceException("应用已部署，不能重复部署");
+        }
+        Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!Files.isDirectory(appDir)) {
+            log.info("本地源码不存在，从 Gitee 拉取, appId={}, dir={}", appId, appDir);
+            giteeService.pull(appId);
+        }
+        //编译构建
+        Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
+        AppTypesEnum appType = AppTypesEnum.of(String.valueOf(appMapper.selectTpyeById(appId)));
+        //本地代码保存。模型只回修改过的文件，其余源码仍留在 codes 里
+        Path codePath = FileWriterUtil.saveCode(appId, codes);
+        // 源码推到 Gitee flash-user-code/{appId}/，后续删本地后可再 pull
+        giteeService.push(appId, codes);
+
+        // 创建一个单独的容器
+        int hostPort = createContainer(appId);
+        String url = deployAccessUrl(appId, hostPort);
+        appMapper.updateDeployById(appId, url);
+        log.info("发布容器已创建, appId={}, url={}", appId, url);
+        // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
+        // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
+        packageCode(appType, codePath, appId);
+        return url;
+    }
+
+    /**
+     * 创建一个容器,容器名称与appId相联系,方便后续问题排查。
+     * 宿主机端口冲突时在 8001-9999 内顺延。
+     *
+     * @return 实际映射到宿主机的端口
+     */
+    private int createContainer(Long appId) {
+        String containerName = deployContainerName + "-" + appId;
+        prepareDeployDir(appId);
+        removeContainerIfExists(containerName);
+
+        int port = CommandUtil.generatePort(appId);
+        int maxRetries = deployMaxRetries == null || deployMaxRetries < 1 ? 1 : deployMaxRetries;
+        DockerException lastConflict = null;
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                String containerId = startDeployContainer(containerName, appId, port);
+                log.info("发布容器已启动, name={}, hostPort={}, id={}", containerName, port, containerId);
+                return port;
+            } catch (DockerException e) {
+                if (!isPortConflict(e) || attempt == maxRetries - 1) {
+                    throw new ServiceException("创建发布容器失败: " + e.getMessage());
+                }
+                lastConflict = e;
+                log.warn("宿主机端口 {} 已被占用, 改用下一个端口, appId={}", port, appId);
+                port = nextDeployPort(port);
+            }
+        }
+        throw new ServiceException("创建发布容器失败: " + (lastConflict == null ? "端口均被占用" : lastConflict.getMessage()));
+    }
+
+    /**
+     * 创建该应用的发布目录。门户跑在容器里时写挂载目录，否则写宿主机目录。
+     */
+    private void prepareDeployDir(Long appId) {
+        String appDirName = String.valueOf(appId);
+        Path localParent = Path.of(deployLocalDir);
+        Path target = Files.isDirectory(localParent)
+                ? localParent.resolve(appDirName)
+                : Path.of(deployPath, appDirName);
+        try {
+            Files.createDirectories(target);
+        } catch (IOException e) {
+            throw new ServiceException("创建发布目录失败: " + target);
+        }
+    }
+
+    /**
+     * 创建并启动发布容器。宿主机端口映射到容器内 80。
+     *
+     * @return 容器 ID
+     */
+    private String startDeployContainer(String containerName, Long appId, int hostPort) {
+        String appDirName = String.valueOf(appId);
+        ExposedPort containerPort = ExposedPort.tcp(80);
+        HostConfig hostConfig = HostConfig.newHostConfig()
+                .withPortBindings(PortBinding.parse(hostPort + ":80"))
+                .withBinds(
+                        Bind.parse(deployPath + "/" + appDirName + ":/workspace/user-deploy/" + appDirName),
+                        Bind.parse(deployScriptDir() + ":/workspace/scripts:ro"),
+                        Bind.parse(deployNginxPath + ":/etc/nginx/nginx.conf:ro")
+                );
+        CreateContainerResponse created = dockerClient.createContainerCmd(deployImage)
+                .withName(containerName)
+                .withExposedPorts(containerPort)
+                .withHostConfig(hostConfig)
+                .exec();
+        try {
+            dockerClient.startContainerCmd(created.getId()).exec();
+            return created.getId();
+        } catch (DockerException e) {
+            removeContainerQuietly(created.getId());
+            throw e;
+        }
+    }
+
+    /**
+     * 同名容器已存在时先删掉，避免名称冲突被当成端口冲突。
+     */
+    private void removeContainerIfExists(String containerName) {
+        try {
+            dockerClient.inspectContainerCmd(containerName).exec();
+            dockerClient.removeContainerCmd(containerName).withForce(true).exec();
+            log.info("已删除同名发布容器: {}", containerName);
+        } catch (NotFoundException ignored) {
+            // 首次发布没有同名容器
+        }
+    }
+
+    /**
+     * 启动失败时删掉已创建但未运行的容器。
+     */
+    private void removeContainerQuietly(String containerId) {
+        try {
+            dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+        } catch (DockerException e) {
+            log.warn("删除未启动的发布容器失败, id={}, error={}", containerId, e.getMessage());
+        }
+    }
+
+    /**
+     * 判断 Docker 报错是不是宿主机端口已被占用。
+     */
+    private static boolean isPortConflict(DockerException e) {
+        String message = e.getMessage();
+        if (message == null && e.getCause() != null) {
+            message = e.getCause().getMessage();
+        }
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        return lower.contains("port is already allocated") || lower.contains("address already in use");
+    }
+
+    /**
+     * 根据 nginx 配置文件位置找到旁边的 script 目录。
+     */
+    private Path deployScriptDir() {
+        Path nginxFile = Path.of(deployNginxPath);
+        Path parent = nginxFile.getParent();
+        if (parent == null) {
+            throw new ServiceException("发布 nginx 配置路径不正确: " + deployNginxPath);
+        }
+        Path besideConf = parent.resolve("script");
+        if (Files.isDirectory(besideConf)) {
+            return besideConf;
+        }
+        if (parent.getParent() != null) {
+            Path besideNginx = parent.getParent().resolve("script");
+            if (Files.isDirectory(besideNginx)) {
+                return besideNginx;
+            }
+        }
+        return besideConf;
+    }
+
+    /**
+     * 拼发布后的访问地址：{host}:{端口}/deploy/{appId}/#/
+     */
+    private String deployAccessUrl(Long appId, int hostPort) {
+        String host = deployHost == null ? "" : deployHost.trim();
+        while (host.endsWith("/")) {
+            host = host.substring(0, host.length() - 1);
+        }
+        return host + ":" + hostPort + "/deploy/" + appId + "/#/";
+    }
+
+    /**
+     * 在 8001-9999 内取下一个端口，到末尾后回到 8001。
+     */
+    private static int nextDeployPort(int port) {
+        int index = Math.floorMod(port - FlashcodeConstant.JAR_HOST_PORT_BASE + 1, FlashcodeConstant.JAR_HOST_PORT_RANGE);
+        return FlashcodeConstant.JAR_HOST_PORT_BASE + index;
     }
 
 
@@ -430,7 +653,7 @@ public class AppServiceImpl implements IAppService {
                 // 3. 将生成的 jar 文件保存到指定目录
                 Path workDir = FileWriterUtil.copyJarPreview(backDir, appId);
                 // 4.启动jar包
-                CommandUtil.runJar(dockerClient,workDir,appId,CONTAINER_NAME);
+                CommandUtil.runJar(dockerClient,workDir,appId, PREVIEW_CONTAINER_NAME);
             }
         }
     }

@@ -6,6 +6,7 @@ import com.bitejiuyeke.biteportalservice.flash.domain.dto.require.GetSrcParam;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GenerateAppDTO;
 import com.bitejiuyeke.biteportalservice.flash.domain.dto.result.GetSrcDTO;
+import jakarta.validation.constraints.NotNull;
 
 /**
  *
@@ -39,4 +40,11 @@ public interface IAppService {
      * @return
      */
     GenerateAppDTO appAdvancedEdit(Long appId);
+
+    /**
+     * 应用公开部署
+     * @param appId
+     * @return
+     */
+    String appDeploy(@NotNull Long appId);
 }

@@ -106,7 +106,7 @@ public class CommandUtil {
             throw new ServiceException("预览容器名不能为空");
         }
         Path jarFile = resolveJarFile(jarOrDir);
-        int port = generatePort(appId, FlashcodeConstant.USER_PREVIEW_DIR);
+        int port = generatePort(appId);
         String jarName = jarFile.getFileName().toString();
         String jarInContainer = "/workspace/" + FlashcodeConstant.USER_PREVIEW_DIR + "/" + appId + "/" + jarName;
         String pidFile = "/tmp/flashcode-" + appId + ".pid";
@@ -127,15 +127,16 @@ public class CommandUtil {
     }
 
     /**
-     * 使用 appId 生成固定端口，范围 8001-9999。
-     * user-develop 部署固定使用 8080。
+     * 按 appId 算出固定端口，范围 8001-9999。
+     * 预览时这是共享容器里的进程端口；发布时这是宿主机映射端口。
+     * 同一个 appId 结果不变，不同应用不会都占用 8080。
      */
-    private static int generatePort(Long appId, String previewDeployPath) {
-        if (FlashcodeConstant.USER_DEVELOP_DIR.equals(previewDeployPath)) {
-            return FlashcodeConstant.JAR_CONTAINER_PORT;
+    public static int generatePort(Long appId) {
+        if (appId == null) {
+            throw new ServiceException("应用ID不能为空");
         }
         int port = FlashcodeConstant.JAR_HOST_PORT_BASE
-                + (int) (appId % FlashcodeConstant.JAR_HOST_PORT_RANGE);
+                + (int) (Math.floorMod(appId, FlashcodeConstant.JAR_HOST_PORT_RANGE));
         log.info("为 appId {} 分配端口: {}", appId, port);
         return port;
     }
