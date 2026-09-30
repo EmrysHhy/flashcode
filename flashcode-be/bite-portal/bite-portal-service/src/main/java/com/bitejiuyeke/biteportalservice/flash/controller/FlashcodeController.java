@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.USER_ID;
+
 
 /**
  *
@@ -45,6 +47,7 @@ public class FlashcodeController {
     public R<String> test(@RequestParam String input, @RequestParam String conversationId) {
         String content = ChatContentSupport.collect(chatClient.prompt()
                 .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
+
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build())

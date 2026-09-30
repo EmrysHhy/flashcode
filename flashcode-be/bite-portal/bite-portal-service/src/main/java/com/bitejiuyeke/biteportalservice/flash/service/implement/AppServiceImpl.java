@@ -113,7 +113,9 @@ public class AppServiceImpl implements IAppService {
         String appCode = ChatContentSupport.collect(chatClient.prompt()
                 .system(getSysPrompt(appId))
                 .user(getUserPrompt(requirement))
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId))
+                        .param(FlashcodeConstant.USER_ID, ownerId)
+                        .param(FlashcodeConstant.APP_ID, appId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build()));
@@ -210,9 +212,13 @@ public class AppServiceImpl implements IAppService {
         String editAppSysPrompt = getEditAppSysPrompt(appEditParam.getElementSelector(), appEditParam.getNewContent());
         //获得大模型修改之后的代码
         // 不写入会话记忆。用户提示词里带了全部源码，chat_history.content 装不下，下一轮也会把源码再喂给模型
+        LoginUserDTO loginUser = tokenService.getLoginUser();
+        Long userId = loginUser == null ? null : loginUser.getUserId();
         String appCode = ChatContentSupport.collect(chatClient.prompt()
                 .system(editAppSysPrompt)
                 .user(editAppUserPrompt)
+                .advisors(a -> a.param(FlashcodeConstant.USER_ID, userId)
+                        .param(FlashcodeConstant.APP_ID, appId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build()));
@@ -329,7 +335,8 @@ public class AppServiceImpl implements IAppService {
             throw new ServiceException("应用不存在");
         }
         if (Integer.valueOf(DeployStatusEnum.DEPLOYED.getValue()).equals(app.getDeployStatus())) {
-            throw new ServiceException("应用已部署，不能重复部署");
+            log.info("应用已经部署完毕,直接返回URL");
+            return app.getAppUrl();
         }
         Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
                 .toAbsolutePath()

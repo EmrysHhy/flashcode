@@ -171,7 +171,15 @@ spring:
 wx:
   applet:
     app-id: wxced773bb27a21222
-    app-secret: 21d9bf91f89d410868dde7f0b7226433','654d56916263537e391277d77bd8604f',now(),now(),'nacos','112.46.64.96','门户首页服务','flashcode-dev',NULL,NULL,NULL,'yaml',NULL,'');
+    app-secret: 21d9bf91f89d410868dde7f0b7226433
+flashcode:
+  vision:
+    model: qwen3-vl-plus
+  ai:
+    context-windows:
+      "[qwen3-coder-plus]": 1000000
+      "[qwen3-vl-plus]": 262144
+      "[qwen3.7-text-embedding-flash]": 131072','654d56916263537e391277d77bd8604f',now(),now(),'nacos','112.46.64.96','门户首页服务','flashcode-dev',NULL,NULL,NULL,'yaml',NULL,'');
 INSERT INTO config_info (data_id,group_id,content,md5,gmt_create,gmt_modified,src_user,src_ip,app_name,tenant_id,c_desc,c_use,effect,`type`,c_schema,encrypted_data_key) VALUES
     ('share-caffeine-dev.yaml','DEFAULT_GROUP','caffeine:
   build:

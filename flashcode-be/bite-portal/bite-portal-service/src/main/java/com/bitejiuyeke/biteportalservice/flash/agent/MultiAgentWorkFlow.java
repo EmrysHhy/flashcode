@@ -139,6 +139,7 @@ public class MultiAgentWorkFlow {
         }
         Map<String, Object> input = new HashMap<>();
         input.put(FlashcodeConstant.APP_ID, appId);
+        input.put(FlashcodeConstant.USER_ID, ownerId);
         input.put(FlashcodeConstant.REQUIREMENT, requirement);
         input.put(FlashcodeConstant.GENERATE_ATTEMPT, 0);
         input.put(FlashcodeConstant.SCREENSHOT_ATTEMPT, 0);
@@ -178,6 +179,7 @@ public class MultiAgentWorkFlow {
             HashMap<String, KeyStrategy> strategies = new HashMap<>();
             ReplaceStrategy replace = new ReplaceStrategy();
             strategies.put(FlashcodeConstant.APP_ID, replace);
+            strategies.put(FlashcodeConstant.USER_ID, replace);
             strategies.put(FlashcodeConstant.REQUIREMENT, replace);
             strategies.put(FlashcodeConstant.FILES, replace);
             strategies.put(FlashcodeConstant.APP_IS_GENERATE, replace);

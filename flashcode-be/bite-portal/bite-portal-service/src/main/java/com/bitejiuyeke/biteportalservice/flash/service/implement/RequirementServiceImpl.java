@@ -15,6 +15,11 @@ import org.springframework.stereotype.Service;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.APP_ID;
+import static com.bitejiuyeke.biteportalservice.flash.constants.FlashcodeConstant.USER_ID;
+
+
+
 /**
  *
  * @author Emrys
@@ -38,7 +43,8 @@ public class RequirementServiceImpl implements IRequirementService {
     @Override
     public RequirementDTO generateRequirement(String input) {
         AppDO appDO = new AppDO();
-        appDO.setUserId(tokenService.getLoginUser().getUserId());
+        Long userId = tokenService.getLoginUser().getUserId();
+        appDO.setUserId(userId);
         appDO.setAppName("待生成");
         appDO.setAppDesc("待生成");
         appMapper.insert(appDO);
@@ -46,7 +52,9 @@ public class RequirementServiceImpl implements IRequirementService {
         String content = ChatContentSupport.collect(chatClient.prompt()
                 .system(getSysPrompt())
                 .user(input)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)));
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)
+                        .param(USER_ID, userId)
+                        .param(APP_ID, appDO.getId())));
         AppDO parsed = buildAppDO(content);
         appDO.setAppName(parsed.getAppName());
         appDO.setAppDesc(parsed.getAppDesc());

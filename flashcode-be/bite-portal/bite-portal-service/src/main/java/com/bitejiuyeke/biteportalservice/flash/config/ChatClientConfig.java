@@ -1,6 +1,8 @@
 package com.bitejiuyeke.biteportalservice.flash.config;
 
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
+import com.bitejiuyeke.biteportalservice.flash.advisor.TokenUsageAdvisor;
+import com.bitejiuyeke.biteportalservice.flash.config.RedisChatMemoryConfig;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -32,12 +34,14 @@ public class ChatClientConfig {
     }
 
     @Bean("chatClient")
-    public ChatClient chatClient(ChatClient.Builder builder, RedisChatMemoryConfig redisChatMemoryConfig) {
+    public ChatClient chatClient(ChatClient.Builder builder,
+                                 RedisChatMemoryConfig redisChatMemoryConfig,
+                                 TokenUsageAdvisor tokenUsageAdvisor) {
         MessageChatMemoryAdvisor messageChatMemoryAdvisor = MessageChatMemoryAdvisor.builder(redisChatMemoryConfig)
                 .build();
 
         return builder
-                .defaultAdvisors(messageChatMemoryAdvisor, new SimpleLoggerAdvisor())
+                .defaultAdvisors(messageChatMemoryAdvisor, tokenUsageAdvisor, new SimpleLoggerAdvisor())
                 .defaultOptions(
                         DashScopeChatOptions.builder()
                                 .topP(0.7)

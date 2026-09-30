@@ -186,3 +186,6 @@ Windows 检出的 `update_nginx_location.sh` 带 `\r`，bash 把 `\r` 当命令�
 docker logs --tail 300 flashcode-bite-portal-service-1
 docker inspect -f '{{.State.Health.Status}}' flashcode-milvus-standalone
 ```
+
+
+

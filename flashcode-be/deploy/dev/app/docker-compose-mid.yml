@@ -272,5 +272,43 @@ services:
     restart: always
     networks:
       - flashcode_network
+
+  flashcode-prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: flashcode-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/conf/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../data/flashcodedata/prometheus/data:/prometheus
+    restart: always
+    networks:
+      - flashcode_network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  flashcode-grafana:
+    image: grafana/grafana:10.2.0
+    container_name: flashcode-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=bite@123
+    volumes:
+      - ../data/flashcodedata/grafana/data:/var/lib/grafana
+    restart: always
+    depends_on:
+      - flashcode-prometheus
+    networks:
+      - flashcode_network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 networks:
   flashcode_network:

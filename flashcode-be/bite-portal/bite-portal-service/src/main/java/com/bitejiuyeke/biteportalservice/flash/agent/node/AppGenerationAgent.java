@@ -54,7 +54,9 @@ public class AppGenerationAgent implements NodeAction {
             }
             Path image = VisionChatSupport.resolveImage(
                     state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
-            String appCode = generateCode(appId, requirement, image);
+            String appCode = generateCode(appId,
+                    state.value(FlashcodeConstant.USER_ID, Long.class).orElse(null),
+                    requirement, image);
             log.info("\n生成应用代码完成，appId: {}, appCode: {}\n", appId, appCode);
 
             Map<String, String> files = AnalysisUtil.getFiles(appCode);
@@ -87,14 +89,16 @@ public class AppGenerationAgent implements NodeAction {
 
     }
 
-    private String generateCode(Long appId, String requirement, Path image) {
+    private String generateCode(Long appId, Long userId, String requirement, Path image) {
         var spec = chatClient.prompt()
                 .system(getSysPrompt(appId))
                 .user(u -> {
                     u.text(getUserPrompt(requirement, image != null));
                     VisionChatSupport.attachImage(u, image);
                 })
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)))
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId))
+                        .param(FlashcodeConstant.USER_ID, userId)
+                        .param(FlashcodeConstant.APP_ID, appId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build());

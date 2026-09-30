@@ -57,7 +57,9 @@ public class ErrorFixAgent implements NodeAction {
                         state.value(FlashcodeConstant.CODE_PATH, String.class).orElse(null));
                 Path image = VisionChatSupport.resolveImage(
                         state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
-                String appCode = fixError(appId, errorType, errorMessage, requirement, appTypeName, files, image);
+                String appCode = fixError(appId,
+                        state.value(FlashcodeConstant.USER_ID, Long.class).orElse(null),
+                        errorType, errorMessage, requirement, appTypeName, files, image);
                 log.info("修复应用代码，appId: {}, appCode: {}", appId, appCode);
 
                 Map<String, String> newFiles = AnalysisUtil.getFiles(appCode); // 解析出文件
@@ -83,7 +85,7 @@ public class ErrorFixAgent implements NodeAction {
 
     }
 
-    private String fixError(Long appId, String errorType, String errorMessage, String requirement, String appTypeName,
+    private String fixError(Long appId, Long userId, String errorType, String errorMessage, String requirement, String appTypeName,
                             Map<String, String> files, Path image) {
         Map<String, String> currentFiles = files == null ? Map.of() : files;
         var spec = chatClient.prompt()
@@ -92,7 +94,9 @@ public class ErrorFixAgent implements NodeAction {
                     u.text(fixUserPrompt(errorMessage, errorType, currentFiles, appTypeName, requirement, image != null));
                     VisionChatSupport.attachImage(u, image);
                 })
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId)));
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId))
+                        .param(FlashcodeConstant.USER_ID, userId)
+                        .param(FlashcodeConstant.APP_ID, appId));
         if (image != null) {
             log.info("带参考图修复，切换视觉模型 {}, stage={}", visionModel, errorType);
             spec = spec.options(VisionChatSupport.vlOptions(visionModel));

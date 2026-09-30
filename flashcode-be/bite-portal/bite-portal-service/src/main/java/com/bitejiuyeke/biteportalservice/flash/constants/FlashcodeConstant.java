@@ -19,6 +19,7 @@ public class FlashcodeConstant extends CommonConstants {
      */
     public static final String REQUIREMENT = "requirement";
     public static final String APP_ID = "appId";
+    public static final String MODEL = "model";
     public static final String REFERENCE_PATH = "referencePath";
     public static final String FILES = "files";
     public static final String APP_IS_GENERATE = "appIsGenerate";
