@@ -6,12 +6,12 @@ import com.bitejiuyeke.biteportalservice.flash.config.RedisChatMemoryConfig;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.boot.web.client.ClientHttpRequestFactories;
-import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
 import org.springframework.boot.web.client.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 
 /**
@@ -21,16 +21,17 @@ import java.time.Duration;
 public class ChatClientConfig {
 
     /**
-     * 拉长 DashScope HTTP 读超时。
-     * 生成完整应用代码可能要几分钟，OkHttp 默认大约 10 秒就会 SocketTimeoutException。
+     * 拉长 DashScope 的 HTTP 超时。对话和向量检索共用这个 RestClient。
+     * 默认大约 10 秒，embedding 接口经常在返回响应头之前就超时。
      */
     @Bean
     public RestClientCustomizer dashScopeTimeoutCustomizer() {
-        return builder -> builder.requestFactory(ClientHttpRequestFactories.get(
-                ClientHttpRequestFactorySettings.DEFAULTS
-                        .withConnectTimeout(Duration.ofSeconds(30))
-                        .withReadTimeout(Duration.ofMinutes(10))
-        ));
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofMinutes(10));
+        return builder -> builder.requestFactory(requestFactory);
     }
 
     @Bean("chatClient")

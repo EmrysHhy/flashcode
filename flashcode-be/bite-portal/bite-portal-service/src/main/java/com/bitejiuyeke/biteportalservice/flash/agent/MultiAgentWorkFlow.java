@@ -84,6 +84,7 @@ public class MultiAgentWorkFlow {
     private final CompiledGraph compiledGraph;
     private final Integer deleteCodeExpire;
     private final String visionModel;
+    private final String nginxPre;
     private final ScheduledExecutorService scheduledExecutorService;
 
     /** 图中注册的节点 id，与 addNode / addConditionalEdges 映射目标一致 */
@@ -102,6 +103,7 @@ public class MultiAgentWorkFlow {
                               DockerClient dockerClient,
                               Integer deleteCodeExpire,
                               String visionModel,
+                              String nginxPre,
                               ScheduledExecutorService scheduledExecutorService) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
@@ -112,6 +114,7 @@ public class MultiAgentWorkFlow {
         this.dockerClient = dockerClient;
         this.deleteCodeExpire = deleteCodeExpire;
         this.visionModel = visionModel;
+        this.nginxPre = nginxPre;
         this.scheduledExecutorService = scheduledExecutorService;
         this.stateGraph = new StateGraph(keyStrategyFactory());
         addNode();
@@ -327,7 +330,7 @@ public class MultiAgentWorkFlow {
             stateGraph.addNode(ID_APP_GENERATION_AGENT,
                     AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, visionModel)));
             stateGraph.addNode(ID_BUILD_PREVIEW_NODE,
-                    AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper)));
+                    AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper, nginxPre)));
             stateGraph.addNode(ID_ERROR_FIX_AGENT,
                     AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, visionModel)));
             stateGraph.addNode(ID_APP_SCREENSHOT_NODE,

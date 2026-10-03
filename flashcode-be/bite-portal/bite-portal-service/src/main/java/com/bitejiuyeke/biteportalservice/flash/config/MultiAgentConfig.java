@@ -30,6 +30,8 @@ public class MultiAgentConfig {
 
     @Value("${flashcode.vision.model:qwen3-vl-plus}")
     private String visionModel;
+    @Value("${flashcode.preview.nginx_pre:http://192.168.56.107:80/preview/}")
+    private String nginxPre;
 
     /**
      * 启动时组图并 compile，之后各请求复用同一份 CompiledGraph。
@@ -52,6 +54,7 @@ public class MultiAgentConfig {
                 dockerClient,
                 deleteCodeExpire,
                 visionModel,
+                nginxPre,
                 scheduledExecutorService);
     }
 

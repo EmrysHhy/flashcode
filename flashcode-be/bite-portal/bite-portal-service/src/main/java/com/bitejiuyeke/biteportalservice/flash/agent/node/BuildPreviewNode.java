@@ -11,7 +11,6 @@ import com.bitejiuyeke.biteportalservice.flash.utils.CommandUtil;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -26,17 +25,18 @@ import java.util.Map;
 @Slf4j
 public class BuildPreviewNode implements NodeAction {
 
+    private static final String DEFAULT_NGINX_PRE = "http://192.168.56.107:80/preview/";
+    private static final String DEFAULT_CONTAINER_NAME = "flashcode-userapp-preview";
+
     private final DockerClient dockerClient;
-
     private final AppMapper appMapper;
-    @Value("${flashcode.preview.nginx_pre:http://192.168.56.107:80/preview/}")
-    private String NGINX_PRE;
-    @Value("${flashcode.preview.container_name:flashcode-userapp-preview}")
-    private String CONTAINER_NAME;
+    private final String nginxPre;
 
-    public BuildPreviewNode(DockerClient dockerClient, AppMapper appMapper) {
+    public BuildPreviewNode(DockerClient dockerClient, AppMapper appMapper, String nginxPre) {
         this.dockerClient = dockerClient;
         this.appMapper = appMapper;
+        String prefix = nginxPre == null || nginxPre.isBlank() ? DEFAULT_NGINX_PRE : nginxPre;
+        this.nginxPre = prefix.endsWith("/") ? prefix : prefix + "/";
     }
 
     @Override
@@ -53,8 +53,7 @@ public class BuildPreviewNode implements NodeAction {
             Path codePath = codePathStr != null ? Path.of(codePathStr) : null;
             Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
             packageCode(appType, codePath, appId);
-            String url = NGINX_PRE + appId + "/#/";
-            //String url = FlashcodeConstant.NGINX_PRE + appId + "/#/";
+            String url = nginxPre + appId + "/#/";
             int updated = appMapper.updateUrlById(appId, url);
             if (updated <= 0) {
                 throw new BuildStageException(FlashcodeConstant.STAGE_UPDATE_URL, false,
@@ -110,7 +109,7 @@ public class BuildPreviewNode implements NodeAction {
                 Path workDir = runStage(FlashcodeConstant.STAGE_COPY_PREVIEW, true,
                         () -> FileWriterUtil.copyJarPreview(backDir, appId));
                 runStage(FlashcodeConstant.STAGE_START_JAR, false,
-                        () -> CommandUtil.runJar(dockerClient, workDir, appId, CONTAINER_NAME));
+                        () -> CommandUtil.runJar(dockerClient, workDir, appId, DEFAULT_CONTAINER_NAME));
             }
         }
     }

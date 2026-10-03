@@ -8,6 +8,7 @@ import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -27,6 +28,8 @@ import java.time.Duration;
 public class SeleniumUtil {
 
     private static final String SCREENSHOT_FILE = "screenshot.png";
+    /** 门户镜像构建时安装，版本与 google-chrome 一致。 */
+    private static final Path CHROME_DRIVER = Path.of("/usr/local/bin/chromedriver");
 
     public static Path screenshot(Long appId, String url) {
         if (appId == null) {
@@ -47,7 +50,7 @@ public class SeleniumUtil {
         WebDriver driver = null;
         try {
             Files.createDirectories(appDir);
-            driver = new ChromeDriver(chromeOptions());
+            driver = openChrome();
             driver.get(url);
             waitPageReady(driver);
             File temp = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
@@ -64,6 +67,20 @@ public class SeleniumUtil {
                 driver.quit();
             }
         }
+    }
+
+    /**
+     * 使用镜像内的 ChromeDriver。未安装时才交给 Selenium Manager，避免容器去外网下载驱动。
+     */
+    private static ChromeDriver openChrome() {
+        ChromeOptions options = chromeOptions();
+        if (!Files.isExecutable(CHROME_DRIVER)) {
+            return new ChromeDriver(options);
+        }
+        ChromeDriverService service = new ChromeDriverService.Builder()
+                .usingDriverExecutable(CHROME_DRIVER.toFile())
+                .build();
+        return new ChromeDriver(service, options);
     }
 
     private static ChromeOptions chromeOptions() {
