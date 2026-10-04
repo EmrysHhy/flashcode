@@ -15,11 +15,11 @@
     <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
     <modules>
-        <module>bite-admin</module>
-        <module>bite-common</module>
-        <module>bite-gateway</module>
-        <module>bite-file</module>
-        <module>bite-portal</module>
+        <module>admin</module>
+        <module>common</module>
+        <module>gateway</module>
+        <module>file</module>
+        <module>portal</module>
     </modules>
 
     <properties>
