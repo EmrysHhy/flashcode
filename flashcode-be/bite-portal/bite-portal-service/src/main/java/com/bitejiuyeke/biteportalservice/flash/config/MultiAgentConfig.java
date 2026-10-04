@@ -6,6 +6,7 @@ import com.bitejiuyeke.biteportalservice.flash.agent.MultiAgentWorkFlow;
 import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.github.dockerjava.api.DockerClient;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -44,7 +45,8 @@ public class MultiAgentConfig {
                                                  IGiteeService giteeService,
                                                  FileFeignClient fileFeignClient,
                                                  DockerClient dockerClient,
-                                                 ScheduledExecutorService scheduledExecutorService) {
+                                                 ScheduledExecutorService scheduledExecutorService,
+                                                 MeterRegistry meterRegistry) {
         return new MultiAgentWorkFlow(chatClient,
                 vectorStore,
                 appMapper,
@@ -55,7 +57,8 @@ public class MultiAgentConfig {
                 deleteCodeExpire,
                 visionModel,
                 nginxPre,
-                scheduledExecutorService);
+                scheduledExecutorService,
+                meterRegistry);
     }
 
     /**

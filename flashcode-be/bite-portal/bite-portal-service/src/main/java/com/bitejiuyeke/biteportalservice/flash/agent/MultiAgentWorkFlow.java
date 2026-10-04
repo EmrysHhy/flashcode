@@ -25,15 +25,22 @@ import com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.biteportalservice.flash.service.IGiteeService;
 import com.bitejiuyeke.biteportalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
 
@@ -86,6 +93,9 @@ public class MultiAgentWorkFlow {
     private final String visionModel;
     private final String nginxPre;
     private final ScheduledExecutorService scheduledExecutorService;
+    private final MeterRegistry meterRegistry;
+    /** 每个 appId 最近一次生成耗时（秒），供 Prometheus 仪表读取。 */
+    private final ConcurrentHashMap<String, AtomicReference<Double>> lastGenerateSeconds = new ConcurrentHashMap<>();
 
     /** 图中注册的节点 id，与 addNode / addConditionalEdges 映射目标一致 */
     private static final String ID_APP_GENERATION_AGENT = "idAppGenerationAgent";
@@ -104,7 +114,8 @@ public class MultiAgentWorkFlow {
                               Integer deleteCodeExpire,
                               String visionModel,
                               String nginxPre,
-                              ScheduledExecutorService scheduledExecutorService) {
+                              ScheduledExecutorService scheduledExecutorService,
+                              MeterRegistry meterRegistry) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
@@ -116,6 +127,7 @@ public class MultiAgentWorkFlow {
         this.visionModel = visionModel;
         this.nginxPre = nginxPre;
         this.scheduledExecutorService = scheduledExecutorService;
+        this.meterRegistry = meterRegistry;
         this.stateGraph = new StateGraph(keyStrategyFactory());
         addNode();
         addEdge();
@@ -156,24 +168,56 @@ public class MultiAgentWorkFlow {
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(String.valueOf(appId))
                 .build();
-        OverAllState state = compiledGraph.invoke(input, config)
-                .orElseThrow(() -> new ServiceException("工作流未返回状态"));
+        long startedAt = System.nanoTime();
+        String outcome = "failure";
+        try {
+            OverAllState state = compiledGraph.invoke(input, config)
+                    .orElseThrow(() -> new ServiceException("工作流未返回状态"));
 
-        if (!state.value(FlashcodeConstant.APP_IS_COMMIT, Boolean.class).orElse(false)) {
-            String error = state.value(FlashcodeConstant.COMMIT_ERROR_MESSAGE, String.class)
-                    .orElseGet(() -> state.value(FlashcodeConstant.SCREENSHOT_ERROR_MESSAGE, String.class)
-                            .orElseGet(() -> state.value(FlashcodeConstant.FIX_ERROR_MESSAGE, String.class)
-                                    .orElseGet(() -> state.value(FlashcodeConstant.BUILD_ERROR_MESSAGE, String.class)
-                                            .orElseGet(() -> state.value(FlashcodeConstant.GENERATE_ERROR_MESSAGE, String.class)
-                                                    .orElse("应用生成失败")))));
-            throw new ServiceException(error);
+            if (!state.value(FlashcodeConstant.APP_IS_COMMIT, Boolean.class).orElse(false)) {
+                String error = state.value(FlashcodeConstant.COMMIT_ERROR_MESSAGE, String.class)
+                        .orElseGet(() -> state.value(FlashcodeConstant.SCREENSHOT_ERROR_MESSAGE, String.class)
+                                .orElseGet(() -> state.value(FlashcodeConstant.FIX_ERROR_MESSAGE, String.class)
+                                        .orElseGet(() -> state.value(FlashcodeConstant.BUILD_ERROR_MESSAGE, String.class)
+                                                .orElseGet(() -> state.value(FlashcodeConstant.GENERATE_ERROR_MESSAGE, String.class)
+                                                        .orElse("应用生成失败")))));
+                throw new ServiceException(error);
+            }
+
+            GenerateAppDTO dto = new GenerateAppDTO();
+            dto.setAppId(appId);
+            dto.setAppType(AppTypesEnum.of(state.value(FlashcodeConstant.APP_TYPE, String.class).orElse(null)));
+            dto.setUrl(state.value(FlashcodeConstant.PREVIEW_URL, String.class).orElse(null));
+            outcome = "success";
+            return dto;
+        } finally {
+            recordGenerateTime(appId, startedAt, outcome);
         }
+    }
 
-        GenerateAppDTO dto = new GenerateAppDTO();
-        dto.setAppId(appId);
-        dto.setAppType(AppTypesEnum.of(state.value(FlashcodeConstant.APP_TYPE, String.class).orElse(null)));
-        dto.setUrl(state.value(FlashcodeConstant.PREVIEW_URL, String.class).orElse(null));
-        return dto;
+    /**
+     * 按 appId 记录本次生成耗时。仪表是最近一次秒数，计时器用于累计次数和平均耗时。
+     */
+    private void recordGenerateTime(Long appId, long startedAtNanos, String outcome) {
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAtNanos);
+        double seconds = elapsed.toNanos() / 1_000_000_000.0;
+        Tags tags = Tags.of(FlashcodeConstant.APP_ID, String.valueOf(appId));
+        Timer.builder("app_generate")
+                .description("App generation duration by appId")
+                .tags(tags)
+                .tag("outcome", outcome)
+                .register(meterRegistry)
+                .record(elapsed);
+        AtomicReference<Double> holder = lastGenerateSeconds.computeIfAbsent(String.valueOf(appId), ignored -> {
+            AtomicReference<Double> created = new AtomicReference<>(seconds);
+            Gauge.builder("app_generate_last_seconds", created, AtomicReference::get)
+                    .description("Latest app generation duration in seconds by appId")
+                    .tags(tags)
+                    .register(meterRegistry);
+            return created;
+        });
+        holder.set(seconds);
+        log.info("应用生成耗时, appId={}, outcome={}, seconds={}", appId, outcome, seconds);
     }
 
     /** 节点回写的字段一律覆盖，不要 Append */

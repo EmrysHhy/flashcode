@@ -15,7 +15,7 @@ import jakarta.validation.constraints.NotNull;
  */
 public interface IAppService {
 
-    GenerateAppDTO appGenerate(Long appId, String requirement);
+    //GenerateAppDTO appGenerate(Long appId, String requirement);
 
     /**
      * 按应用 ID 查询详情

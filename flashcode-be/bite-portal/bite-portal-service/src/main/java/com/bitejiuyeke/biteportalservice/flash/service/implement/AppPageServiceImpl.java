@@ -33,8 +33,6 @@ public class AppPageServiceImpl implements IAppPageService {
     @Autowired
     AppMapper appMapper;
     @Autowired
-    AppUserMapper userMapper;
-    @Autowired
     ChatHistoryMapper chatHistoryMapper;
     @Autowired
     TokenService tokenService;
