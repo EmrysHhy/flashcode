@@ -195,7 +195,7 @@ $white: #fff;
 
 .header {
   width: 100%;
-  height: 64px;
+  height: 70px;
   background-color: $white;
   border-bottom: 1px solid $border-color;
 }
@@ -217,7 +217,7 @@ $white: #fff;
 }
 
 .header__logo img {
-  height: 36px;
+  height: 72px;
   width: auto;
 }
 

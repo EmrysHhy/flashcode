@@ -4,11 +4,11 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bitejiuyeke.biteportalservice.user.mapper.SysUserMapper">
 
-    <select id="selectByPhoneNumber" parameterType="java.lang.String" resultType="com.bitejiuyeke.biteportalservice.user.domain.entity.SysUser">
+    <select id="selectByPhoneNumber" parameterType="java.lang.String" resultType="com.bitejiuyeke.portalservice.user.domain.entity.SysUser">
         select * from sys_user where phone_number = #{phoneNumber}
     </select>
 
-    <select id="selectList" parameterType="com.bitejiuyeke.biteportalservice.user.domain.entity.SysUser" resultType="com.bitejiuyeke.biteportalservice.user.domain.entity.SysUser">
+    <select id="selectList" parameterType="com.bitejiuyeke.portalservice.user.domain.entity.SysUser" resultType="com.bitejiuyeke.portalservice.user.domain.entity.SysUser">
         select *from sys_user
         <where>
             <if test="id !=null and id != ''">

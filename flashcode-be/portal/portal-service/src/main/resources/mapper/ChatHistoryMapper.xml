@@ -5,8 +5,8 @@
 <mapper namespace="com.bitejiuyeke.biteportalservice.flash.mapper.ChatHistoryMapper">
 
     <select id="selectChatHistory"
-            parameterType="com.bitejiuyeke.biteportalservice.flash.domain.dto.require.ChatHistoryReqParam"
-            resultType="com.bitejiuyeke.biteportalservice.flash.domain.entity.ChatHistoryDO">
+            parameterType="com.bitejiuyeke.portalservice.flash.domain.dto.require.ChatHistoryReqParam"
+            resultType="com.bitejiuyeke.portalservice.flash.domain.entity.ChatHistoryDO">
         SELECT h.id, h.app_id, h.chat_role, h.content
         FROM chat_history h
         WHERE h.app_id = #{appId}
@@ -16,7 +16,7 @@
     </select>
 
     <select id="countChatHistory"
-            parameterType="com.bitejiuyeke.biteportalservice.flash.domain.dto.require.ChatHistoryReqParam"
+            parameterType="com.bitejiuyeke.portalservice.flash.domain.dto.require.ChatHistoryReqParam"
             resultType="java.lang.Long">
         SELECT COUNT(1)
         FROM chat_history h

@@ -5,8 +5,8 @@
 <mapper namespace="com.bitejiuyeke.biteportalservice.flash.mapper.AppMapper">
 
     <select id="selectMyselfAppByUserId"
-            parameterType="com.bitejiuyeke.biteportalservice.flash.domain.dto.require.MyselfListReqParam"
-            resultType="com.bitejiuyeke.biteportalservice.flash.domain.entity.AppDO">
+            parameterType="com.bitejiuyeke.portalservice.flash.domain.dto.require.MyselfListReqParam"
+            resultType="com.bitejiuyeke.portalservice.flash.domain.entity.AppDO">
         SELECT id, user_id, app_name, app_desc, app_type, app_screenshot
         FROM app
         WHERE user_id = #{userId}
@@ -18,7 +18,7 @@
     </select>
 
     <select id="countMyselfApp"
-            parameterType="com.bitejiuyeke.biteportalservice.flash.domain.dto.require.MyselfListReqParam"
+            parameterType="com.bitejiuyeke.portalservice.flash.domain.dto.require.MyselfListReqParam"
             resultType="java.lang.Long">
         SELECT COUNT(1)
         FROM app
@@ -28,7 +28,7 @@
         </if>
     </select>
 
-    <select id="selectSquareApp" resultType="com.bitejiuyeke.biteportalservice.flash.domain.dto.result.SquareAppDTO">
+    <select id="selectSquareApp" resultType="com.bitejiuyeke.portalservice.flash.domain.dto.result.SquareAppDTO">
         SELECT a.id,
                a.user_id,
                u.nick_name AS user_name,
