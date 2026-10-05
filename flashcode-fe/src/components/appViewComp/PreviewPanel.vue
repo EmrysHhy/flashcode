@@ -413,14 +413,12 @@ const handleOpenInNewWindow = () => {
   }
 };
 
-// 发布应用
-// 点击时先打开新标签，成功后再跳到已发布页面。等接口返回再 window.open 会被浏览器拦截
+// 发布应用。等待期间留在当前页（按钮显示「发布中」），拿到地址后再打开新标签
 const handleDeploy = async () => {
   if (!props.appDetail?.id || isDeploying.value) {
     return;
   }
 
-  const popup = window.open('', '_blank');
   try {
     isDeploying.value = true;
     const data = await deployApp(props.appDetail.id);
@@ -429,17 +427,14 @@ const handleDeploy = async () => {
       deployUrl = `http://${deployUrl}`;
     }
     if (!deployUrl) {
-      popup?.close();
       alert('发布失败：未获取到访问地址');
       return;
     }
-    if (popup) {
-      popup.location.href = deployUrl;
-      return;
+    const popup = window.open(deployUrl, '_blank');
+    if (!popup) {
+      alert(`发布成功。浏览器拦截了新窗口，请手动打开：${deployUrl}`);
     }
-    window.open(deployUrl, '_blank');
   } catch (err) {
-    popup?.close();
     console.error('发布应用失败:', err);
     alert(`发布失败：${err.message || '请稍后重试'}`);
   } finally {
