@@ -26,7 +26,7 @@ public class UserEditReqParam implements Serializable {
     private String email;
 
     /**
-     * 发给已有联系方式的验证码
+     * 发给新手机号或新邮箱的验证码
      */
     private String code;
 }

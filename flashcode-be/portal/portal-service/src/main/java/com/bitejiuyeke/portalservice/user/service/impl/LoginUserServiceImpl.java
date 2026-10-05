@@ -82,7 +82,7 @@ public class LoginUserServiceImpl implements ILoginUserService {
     }
 
     /**
-     * 修改当前用户昵称，并在已有联系方式验证后补绑另一个。
+     * 修改当前用户昵称，并给新联系方式发验证码后再补绑。
      * @param userEditParam 用户编辑参数
      */
     @Override
@@ -111,24 +111,27 @@ public class LoginUserServiceImpl implements ILoginUserService {
             return;
         }
         if (hasEmail && wantPhone) {
-            bindPhoneByEmailCode(user, userEditParam);
+            bindPhone(user, userEditParam);
             return;
         }
         if (hasPhone && wantEmail) {
-            bindEmailByPhoneCode(user, userEditParam);
+            bindEmail(user, userEditParam);
         }
     }
 
-    private void bindPhoneByEmailCode(AppUserDTO user, UserEditReqParam userEditParam) {
+    /**
+     * 已有邮箱时补绑手机号，验证码发给新手机号。
+     */
+    private void bindPhone(AppUserDTO user, UserEditReqParam userEditParam) {
         String phone = userEditParam.getPhone();
         if (!VerifyUtil.checkPhone(phone)) {
             throw new ServiceException("手机号格式错误", ResultCode.INVALID_PARA.getCode());
         }
         if (StringUtils.isBlank(userEditParam.getCode())) {
-            captchaService.sendCode(user.getEmail());
+            captchaService.sendCode(phone);
             return;
         }
-        validateEmailCode(user.getEmail(), userEditParam.getCode());
+        validatePhoneCode(phone, userEditParam.getCode());
         AppUserDTO occupied = appUserService.findByPhone(phone);
         if (occupied != null && !user.getUserId().equals(occupied.getUserId())) {
             throw new ServiceException("手机号已经被占用", ResultCode.INVALID_PARA.getCode());
@@ -136,16 +139,19 @@ public class LoginUserServiceImpl implements ILoginUserService {
         appUserService.bindPhone(user.getUserId(), phone);
     }
 
-    private void bindEmailByPhoneCode(AppUserDTO user, UserEditReqParam userEditParam) {
+    /**
+     * 已有手机号时补绑邮箱，验证码发给新邮箱。
+     */
+    private void bindEmail(AppUserDTO user, UserEditReqParam userEditParam) {
         String email = userEditParam.getEmail();
         if (!VerifyUtil.checkEmail(email)) {
             throw new ServiceException("邮箱格式错误", ResultCode.INVALID_PARA.getCode());
         }
         if (StringUtils.isBlank(userEditParam.getCode())) {
-            captchaService.sendCode(user.getPhoneNumber());
+            captchaService.sendCode(email);
             return;
         }
-        validatePhoneCode(user.getPhoneNumber(), userEditParam.getCode());
+        validateEmailCode(email, userEditParam.getCode());
         AppUserDTO occupied = appUserService.findByEmail(email);
         if (occupied != null && !user.getUserId().equals(occupied.getUserId())) {
             throw new ServiceException("邮箱已经被占用", ResultCode.INVALID_PARA.getCode());

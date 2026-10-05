@@ -33,7 +33,7 @@
         <div v-if="bindTarget" class="profile__bind">
           <h3>{{ bindTarget === 'phone' ? '绑定手机号' : '绑定邮箱' }}</h3>
           <p class="profile__hint">
-            {{ bindTarget === 'phone' ? '验证码会发到已绑定的邮箱' : '验证码会发到已绑定的手机号' }}
+            {{ bindTarget === 'phone' ? '验证码会发到该手机号' : '验证码会发到该邮箱' }}
           </p>
           <label>
             <span>{{ bindTarget === 'phone' ? '手机号' : '邮箱' }}</span>

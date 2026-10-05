@@ -18,9 +18,12 @@
         <button v-if="!userStore.isLoggedIn" class="header__login-btn" @click="handleLogin">
           登录
         </button>
-        <button v-else class="header__avatar" type="button" @click="goProfile">
-          <img v-if="avatarUrl" :src="avatarUrl" alt="头像" />
-          <span v-else>我</span>
+        <button v-else class="header__user" type="button" @click="goProfile">
+          <span class="header__avatar">
+            <img v-if="avatarUrl" :src="avatarUrl" alt="" />
+            <span v-else>我</span>
+          </span>
+          <span v-if="displayName" class="header__name" :title="fullName">{{ displayName }}</span>
         </button>
       </div>
     </div>
@@ -52,7 +55,16 @@ const activeNav = ref('');
 const navItemRefs = ref([]);
 const sliderStyle = ref({});
 const showLoginModal = ref(false);
+const NAME_MAX_LENGTH = 8;
 const avatarUrl = computed(() => userStore.profile?.avatar || '');
+const fullName = computed(() => (userStore.profile?.nickName || '').trim());
+const displayName = computed(() => {
+  const name = fullName.value;
+  if (name.length <= NAME_MAX_LENGTH) {
+    return name;
+  }
+  return `${name.slice(0, NAME_MAX_LENGTH)}…`;
+});
 
 const loadAvatar = async () => {
   if (!userStore.isLoggedIn) {
@@ -239,20 +251,36 @@ $white: #fff;
   background-color: darken($primary-color, 10%);
 }
 
+.header__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
 .header__avatar {
   width: 36px;
   height: 36px;
-  padding: 0;
-  border: none;
   border-radius: 50%;
   overflow: hidden;
   background: #e6f4ff;
   color: $primary-color;
   font-size: 14px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+.header__name {
+  max-width: 8em;
+  overflow: hidden;
+  font-size: 14px;
+  color: $text-color;
+  white-space: nowrap;
 }
 
 .header__avatar img {
