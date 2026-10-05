@@ -1,15 +1,21 @@
 package com.bitejiuyeke.portalservice.user.domain.entity;
 
-import com.bitejiuyeke.bitecommoncore.domain.entity.BaseDO;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 /**
- * C端用户表对应的实体类
+ * C端用户表对应的实体类。app_user 没有 create_time、update_time。
  */
 @Data
-@EqualsAndHashCode(callSuper = true)
-public class AppUser extends BaseDO {
+public class AppUser {
+
+    /**
+     * 自增主键
+     */
+    @TableId(value = "id", type = IdType.AUTO)
+    private Long id;
+
     /**
      * 用户昵称
      */
