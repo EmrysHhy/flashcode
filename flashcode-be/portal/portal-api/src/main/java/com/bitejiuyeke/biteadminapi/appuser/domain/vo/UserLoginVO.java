@@ -1,15 +1,15 @@
-package com.bitejiuyeke.portalservice.user.domain.vo;
+package com.bitejiuyeke.biteadminapi.appuser.domain.vo;
 
 import com.bitejiuyeke.bitecommondomain.domain.vo.LoginUserVO;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * C端用户VO
+ * 当前登录用户信息
  */
-@EqualsAndHashCode(callSuper = true)
 @Data
-public class UserVo extends LoginUserVO {
+@EqualsAndHashCode(callSuper = true)
+public class UserLoginVO extends LoginUserVO {
 
     /**
      * 用户头像

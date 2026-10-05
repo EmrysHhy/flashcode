@@ -1,7 +1,7 @@
 package com.bitejiuyeke.portalservice.user.service.impl;
 
 import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserDTO;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqDTO;
+import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqParam;
 import com.bitejiuyeke.bitecommoncore.utils.VerifyUtil;
 import com.bitejiuyeke.bitecommondomain.domain.ResultCode;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
@@ -82,12 +82,75 @@ public class LoginUserServiceImpl implements ILoginUserService {
     }
 
     /**
-     * 修改用户信息
-     * @param userEditReqDTO C端用户编辑DTO
+     * 修改当前用户昵称，并在已有联系方式验证后补绑另一个。
+     * @param userEditParam 用户编辑参数
      */
     @Override
-    public void edit(UserEditReqDTO userEditReqDTO) {
-        appUserService.edit(userEditReqDTO);
+    public void edit(UserEditReqParam userEditParam) {
+        UserDTO current = getLoginUser();
+        Long userId = current.getUserId();
+        AppUserDTO user = appUserService.findById(userId);
+        if (user == null) {
+            throw new ServiceException("查询用户失败", ResultCode.INVALID_PARA.getCode());
+        }
+        if (StringUtils.isNotBlank(userEditParam.getNickName())) {
+            appUserService.updateNickName(userId, userEditParam.getNickName());
+        }
+
+        boolean hasEmail = StringUtils.isNotBlank(user.getEmail());
+        boolean hasPhone = StringUtils.isNotBlank(user.getPhoneNumber());
+        boolean wantPhone = StringUtils.isNotBlank(userEditParam.getPhone());
+        boolean wantEmail = StringUtils.isNotBlank(userEditParam.getEmail());
+        if (hasEmail && hasPhone) {
+            return;
+        }
+        if (!hasEmail && !hasPhone) {
+            if (wantPhone || wantEmail) {
+                throw new ServiceException("请先绑定一种联系方式", ResultCode.INVALID_PARA.getCode());
+            }
+            return;
+        }
+        if (hasEmail && wantPhone) {
+            bindPhoneByEmailCode(user, userEditParam);
+            return;
+        }
+        if (hasPhone && wantEmail) {
+            bindEmailByPhoneCode(user, userEditParam);
+        }
+    }
+
+    private void bindPhoneByEmailCode(AppUserDTO user, UserEditReqParam userEditParam) {
+        String phone = userEditParam.getPhone();
+        if (!VerifyUtil.checkPhone(phone)) {
+            throw new ServiceException("手机号格式错误", ResultCode.INVALID_PARA.getCode());
+        }
+        if (StringUtils.isBlank(userEditParam.getCode())) {
+            captchaService.sendCode(user.getEmail());
+            return;
+        }
+        validateEmailCode(user.getEmail(), userEditParam.getCode());
+        AppUserDTO occupied = appUserService.findByPhone(phone);
+        if (occupied != null && !user.getUserId().equals(occupied.getUserId())) {
+            throw new ServiceException("手机号已经被占用", ResultCode.INVALID_PARA.getCode());
+        }
+        appUserService.bindPhone(user.getUserId(), phone);
+    }
+
+    private void bindEmailByPhoneCode(AppUserDTO user, UserEditReqParam userEditParam) {
+        String email = userEditParam.getEmail();
+        if (!VerifyUtil.checkEmail(email)) {
+            throw new ServiceException("邮箱格式错误", ResultCode.INVALID_PARA.getCode());
+        }
+        if (StringUtils.isBlank(userEditParam.getCode())) {
+            captchaService.sendCode(user.getPhoneNumber());
+            return;
+        }
+        validatePhoneCode(user.getPhoneNumber(), userEditParam.getCode());
+        AppUserDTO occupied = appUserService.findByEmail(email);
+        if (occupied != null && !user.getUserId().equals(occupied.getUserId())) {
+            throw new ServiceException("邮箱已经被占用", ResultCode.INVALID_PARA.getCode());
+        }
+        appUserService.bindEmail(user.getUserId(), email);
     }
 
     /**

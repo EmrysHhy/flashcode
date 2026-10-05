@@ -25,6 +25,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   const userInfo = ref(initialUserInfo);
+  const profile = ref(null);
   const isLoggedIn = ref(!!accessToken.value);
 
   /**
@@ -67,10 +68,15 @@ export const useUserStore = defineStore('user', () => {
   /**
    * 清除用户信息（退出登录）
    */
+  function setProfile(info) {
+    profile.value = info;
+  }
+
   function clearUserInfo() {
     accessToken.value = '';
     refreshToken.value = '';
     userInfo.value = null;
+    profile.value = null;
     isLoggedIn.value = false;
 
     // 清除 localStorage
@@ -83,8 +89,10 @@ export const useUserStore = defineStore('user', () => {
     accessToken,
     refreshToken,
     userInfo,
+    profile,
     isLoggedIn,
     setUserInfo,
+    setProfile,
     clearUserInfo,
   };
 });

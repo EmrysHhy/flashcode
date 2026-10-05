@@ -18,10 +18,10 @@
         <button v-if="!userStore.isLoggedIn" class="header__login-btn" @click="handleLogin">
           登录
         </button>
-        <div v-else class="user-section">
-          <span class="user-name">{{ getUserDisplayName() }}</span>
-          <span class="btn btn-outline" @click="handleLogout">退出</span>
-        </div>
+        <button v-else class="header__avatar" type="button" @click="goProfile">
+          <img v-if="avatarUrl" :src="avatarUrl" alt="头像" />
+          <span v-else>我</span>
+        </button>
       </div>
     </div>
   </header>
@@ -29,11 +29,10 @@
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick } from 'vue';
+import { computed, onMounted, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { useUserStore } from '@/stores/user';
-import { logout } from '@/apis';
+import { fetchProfile } from '@/apis';
 import Login from '@/components/Login.vue';
 
 // ========== 初始化 ==========
@@ -53,34 +52,23 @@ const activeNav = ref('');
 const navItemRefs = ref([]);
 const sliderStyle = ref({});
 const showLoginModal = ref(false);
+const avatarUrl = computed(() => userStore.profile?.avatar || '');
 
-// ========== 用户信息显示 ==========
-/**
- * 获取用户显示名称，优先级：username > 脱敏手机号 > 脱敏邮箱 > "用户"
- */
-const getUserDisplayName = () => {
-  // 优先显示用户名
-  if (userStore.userInfo?.username) {
-    return userStore.userInfo.username;
+const loadAvatar = async () => {
+  if (!userStore.isLoggedIn) {
+    userStore.setProfile(null);
+    return;
   }
-  
-  // 脱敏手机号：139****1234
-  if (userStore.userInfo?.phone) {
-    const phone = userStore.userInfo.phone;
-    return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+  try {
+    const profile = await fetchProfile();
+    userStore.setProfile(profile);
+  } catch (error) {
+    console.error(error);
   }
-  
-  // 脱敏邮箱：abc***@example.com
-  if (userStore.userInfo?.email) {
-    const email = userStore.userInfo.email;
-    const [name, domain] = email.split('@');
-    if (name.length > 3) {
-      return `${name.substring(0, 3)}***@${domain}`;
-    }
-    return email;
-  }
-  
-  return '用户';
+};
+
+const goProfile = () => {
+  router.push('/profile');
 };
 
 // ========== 登录/登出 ==========
@@ -89,32 +77,6 @@ const getUserDisplayName = () => {
  */
 const handleLogin = () => {
   showLoginModal.value = true;
-};
-
-/**
- * 处理退出登录
- */
-const handleLogout = async () => {
-  const confirmed = window.confirm('确定要退出登录吗？');
-  if (!confirmed) {
-    return;
-  }
-
-  // 调用退出登录接口（允许失败）
-  try {
-    await logout();
-  } catch (error) {
-    console.error('退出登录接口调用失败:', error);
-  }
-
-  // 清除本地用户信息
-  userStore.clearUserInfo();
-  ElMessage.success('已退出登录');
-
-  // 跳转到首页
-  if (router.currentRoute.value.path !== '/') {
-    router.push('/');
-  }
 };
 
 /**
@@ -184,6 +146,7 @@ const syncActiveByRoute = () => {
  */
 onMounted(() => {
   syncActiveByRoute();
+  loadAvatar();
 });
 </script>
 
@@ -276,24 +239,25 @@ $white: #fff;
   background-color: darken($primary-color, 10%);
 }
 
-.user-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-name {
-  font-size: 14px;
-  color: $text-color;
-}
-
-.btn-outline {
-  padding: 6px 16px;
-  font-size: 14px;
-  background: transparent;
+.header__avatar {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e6f4ff;
   color: $primary-color;
-  border-radius: 4px;
+  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style>

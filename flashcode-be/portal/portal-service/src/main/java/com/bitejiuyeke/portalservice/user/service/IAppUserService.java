@@ -1,8 +1,7 @@
 package com.bitejiuyeke.portalservice.user.service;
 
 import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserDTO;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqDTO;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqDTO;
+import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqParam;
 import com.bitejiuyeke.bitecommoncore.domain.dto.BasePageDTO;
 
 import java.util.List;
@@ -55,17 +54,39 @@ public interface IAppUserService {
     AppUserDTO registerByEmail(String email);
 
     /**
-     * 编辑C端用户
-     * @param userEditReqDTO C端用户DTO
+     * 更新昵称
+     * @param userId 用户 ID
+     * @param nickName 昵称
      */
-    void edit(UserEditReqDTO userEditReqDTO);
+    void updateNickName(Long userId, String nickName);
+
+    /**
+     * 更新头像
+     * @param userId 用户 ID
+     * @param avatar 头像 URL
+     */
+    void updateAvatar(Long userId, String avatar);
+
+    /**
+     * 补绑手机号。已有手机号时不覆盖。
+     * @param userId 用户 ID
+     * @param phoneNumber 明文手机号
+     */
+    void bindPhone(Long userId, String phoneNumber);
+
+    /**
+     * 补绑邮箱。已有邮箱时不覆盖。
+     * @param userId 用户 ID
+     * @param email 明文邮箱
+     */
+    void bindEmail(Long userId, String email);
 
     /**
      * 查询C端用户
-     * @param appUserListReqDTO 查询C端用户DTO
+     * @param appUserListParam 查询C端用户DTO
      * @return C端用户分页结果DTO
      */
-    BasePageDTO<AppUserDTO> getUserList(AppUserListReqDTO appUserListReqDTO);
+    BasePageDTO<AppUserDTO> getUserList(AppUserListReqParam appUserListParam);
 
     /**
      * 根据用户ID获取用户信息

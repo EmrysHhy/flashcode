@@ -7,6 +7,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,13 +18,24 @@ import org.springframework.web.multipart.MultipartFile;
 public interface FileFeignClient {
 
     /**
-     * 上传文件到 OSS
+     * 上传应用截图
      *
-     * @param file 文件
+     * @param file 截图文件
+     * @param appId 应用 ID
      * @return 文件 URL 与路径
      */
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    R<FileVO> upload(@RequestPart("file") MultipartFile file);
+    @PostMapping(value = "/upload/screenshot", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    R<FileVO> uploadAppScreenShot(@RequestPart("file") MultipartFile file, @RequestParam("appId") Long appId);
+
+    /**
+     * 上传用户头像
+     *
+     * @param file 头像文件
+     * @param userId 用户 ID
+     * @return 文件 URL 与路径
+     */
+    @PostMapping(value = "/upload/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    R<FileVO> uploadUserAvatar(@RequestPart("file") MultipartFile file, @RequestParam("userId") Long userId);
 
     /**
      * 获取 OSS 直传签名

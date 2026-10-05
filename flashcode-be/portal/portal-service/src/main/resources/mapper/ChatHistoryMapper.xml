@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.bitejiuyeke.biteportalservice.flash.mapper.ChatHistoryMapper">
+<mapper namespace="com.bitejiuyeke.portalservice.flash.mapper.ChatHistoryMapper">
 
     <select id="selectChatHistory"
             parameterType="com.bitejiuyeke.portalservice.flash.domain.dto.require.ChatHistoryReqParam"

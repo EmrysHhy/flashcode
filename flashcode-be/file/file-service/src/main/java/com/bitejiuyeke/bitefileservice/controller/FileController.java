@@ -18,8 +18,13 @@ public class FileController implements FileFeignClient {
     private IFileService fileService;
 
     @Override
-    public R<FileVO> upload(MultipartFile file) {
-        return R.ok(fileService.upload(file));
+    public R<FileVO> uploadAppScreenShot(MultipartFile file, Long appId) {
+        return R.ok(fileService.uploadAppScreenShot(file, appId));
+    }
+
+    @Override
+    public R<FileVO> uploadUserAvatar(MultipartFile file, Long userId) {
+        return R.ok(fileService.uploadUserAvatar(file, userId));
     }
 
     @Override

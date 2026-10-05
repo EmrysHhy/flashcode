@@ -52,6 +52,10 @@
               :disabled="isDeploying" title="发布应用">
               {{ isDeploying ? '发布中...' : '发布' }}
             </button>
+            <button v-if="activeTab === 'code'" class="btn btn-outline btn-sm" @click="handleExitAdvancedEdit"
+              :disabled="isCompletingEdit" title="退出编辑">
+              退出编辑
+            </button>
             <button v-if="activeTab === 'code'" class="btn btn-primary btn-sm" @click="handleCompleteEdit"
               :disabled="isCompletingEdit || isDeploying" title="完成编辑">
               {{ isCompletingEdit ? '处理中...' : '完成编辑' }}
@@ -507,6 +511,14 @@ const handleOpenVscode = async () => {
   } finally {
     isOpeningVscode.value = false;
   }
+};
+
+// 退出高级编辑，只回到预览，不提交 VSCode 里的修改
+const handleExitAdvancedEdit = () => {
+  if (isCompletingEdit.value) {
+    return;
+  }
+  switchTab('preview');
 };
 
 // 完成编辑

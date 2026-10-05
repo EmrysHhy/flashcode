@@ -7,11 +7,11 @@ import lombok.EqualsAndHashCode;
 import java.io.Serializable;
 
 /**
- * 查询C端用户DTO
+ * 查询C端用户参数
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class AppUserListReqDTO extends BasePageReqDTO  implements Serializable {
+public class AppUserListReqParam extends BasePageReqDTO  implements Serializable {
 
     /**
      * 用户ID

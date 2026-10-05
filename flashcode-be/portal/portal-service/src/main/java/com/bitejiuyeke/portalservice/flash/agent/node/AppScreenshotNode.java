@@ -52,7 +52,7 @@ public class AppScreenshotNode implements NodeAction {
             }
             MultipartFile multipartFile = convertToMultipartFile(photoPath);
             //上传到oss
-            R<FileVO> upload = fileFeignClient.upload(multipartFile);
+            R<FileVO> upload = fileFeignClient.uploadAppScreenShot(multipartFile, appId);
             if (upload.getData() == null || upload.getCode() != ResultCode.SUCCESS.getCode()) {
                 throw new ServiceException("上传截图失败");
             }

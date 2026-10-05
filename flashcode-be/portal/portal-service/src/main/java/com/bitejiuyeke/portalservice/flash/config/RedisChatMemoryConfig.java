@@ -65,10 +65,10 @@ public class RedisChatMemoryConfig implements ChatMemory {
             chatHistoryDO.setAppId(appId);
             if (message instanceof UserMessage userMessage) {
                 chatHistoryDO.setChatRole(Role.USER.getValue());
-                chatHistoryDO.setContent(userMessage.getText());
+                chatHistoryDO.setContent(withoutSource(userMessage.getText(), false));
             } else if (message instanceof AssistantMessage assistantMessage) {
                 chatHistoryDO.setChatRole(Role.LLM.getValue());
-                chatHistoryDO.setContent(assistantMessage.getText());
+                chatHistoryDO.setContent(withoutSource(assistantMessage.getText(), true));
             }
             chatHistoryMapper.insert(chatHistoryDO);
 
@@ -153,9 +153,39 @@ public class RedisChatMemoryConfig implements ChatMemory {
         }
         return redisChatHistories.stream()
                 .filter(dto -> dto != null && dto.getContent() != null)
-                .map(dto -> Role.USER.getValue().equals(dto.getChatRole())
-                        ? (Message) new UserMessage(dto.getContent())
-                        : new AssistantMessage(dto.getContent()))
+                .map(dto -> {
+                    boolean assistant = !Role.USER.getValue().equals(dto.getChatRole());
+                    String content = withoutSource(dto.getContent(), assistant);
+                    return assistant ? (Message) new AssistantMessage(content) : new UserMessage(content);
+                })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 源码只留在代码目录。带 FILE: 或 APP_TYPE= 的内容不进入对话记忆。
+     */
+    private static String withoutSource(String content, boolean assistant) {
+        if (content == null || !isSourceCode(content)) {
+            return content;
+        }
+        if (assistant) {
+            return "应用已更新";
+        }
+        int fileAt = content.startsWith("FILE:") ? 0 : content.indexOf("\nFILE:");
+        String head = fileAt > 0 ? content.substring(0, fileAt).strip() : "";
+        if (head.length() > 300) {
+            head = head.substring(0, 300);
+        }
+        return head.isBlank() ? "已提交代码修改" : head;
+    }
+
+    private static boolean isSourceCode(String content) {
+        if (content.isBlank()) {
+            return false;
+        }
+        String trimmed = content.stripLeading();
+        return trimmed.startsWith("APP_TYPE=")
+                || trimmed.startsWith("FILE:")
+                || content.contains("\nFILE:");
     }
 }

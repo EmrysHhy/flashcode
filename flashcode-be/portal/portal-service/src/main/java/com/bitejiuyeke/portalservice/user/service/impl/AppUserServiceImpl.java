@@ -1,9 +1,7 @@
 package com.bitejiuyeke.portalservice.user.service.impl;
 
 import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserDTO;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqDTO;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqDTO;
-
+import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqParam;
 import com.bitejiuyeke.bitecommoncore.domain.dto.BasePageDTO;
 import com.bitejiuyeke.bitecommoncore.utils.AESUtil;
 import com.bitejiuyeke.bitecommondomain.domain.ResultCode;
@@ -153,32 +151,61 @@ public class AppUserServiceImpl implements IAppUserService {
     }
 
     @Override
-    public void edit(UserEditReqDTO userEditReqDTO) {
-        // 1 根据ID查询要编辑的用户
-        AppUser appUser = appUserMapper.selectById(userEditReqDTO.getUserId());
+    public void updateNickName(Long userId, String nickName) {
+        AppUser appUser = requireUser(userId);
+        appUser.setNickName(nickName);
+        appUserMapper.updateById(appUser);
+    }
+
+    @Override
+    public void updateAvatar(Long userId, String avatar) {
+        AppUser appUser = requireUser(userId);
+        appUser.setAvatar(avatar);
+        appUserMapper.updateById(appUser);
+    }
+
+    @Override
+    public void bindPhone(Long userId, String phoneNumber) {
+        AppUser appUser = requireUser(userId);
+        if (StringUtils.isNotEmpty(appUser.getPhoneNumber())) {
+            return;
+        }
+        appUser.setPhoneNumber(AESUtil.encryptHex(phoneNumber));
+        appUserMapper.updateById(appUser);
+    }
+
+    @Override
+    public void bindEmail(Long userId, String email) {
+        AppUser appUser = requireUser(userId);
+        if (StringUtils.isNotEmpty(appUser.getEmail())) {
+            return;
+        }
+        appUser.setEmail(AESUtil.encryptHex(email));
+        appUserMapper.updateById(appUser);
+    }
+
+    private AppUser requireUser(Long userId) {
+        AppUser appUser = appUserMapper.selectById(userId);
         if (appUser == null) {
             throw new ServiceException("用户不存在", ResultCode.INVALID_PARA.getCode());
         }
-        // 2 查到用户，进行编辑操作
-        appUser.setNickName(userEditReqDTO.getNickName());
-        appUser.setAvatar(userEditReqDTO.getAvtar());
-        appUserMapper.updateById(appUser);
+        return appUser;
     }
 
     /**
      * 查询C端用户
-     * @param appUserListReqDTO 查询C端用户DTO
+     * @param appUserListParam 查询C端用户DTO
      * @return C端用户分页结果DTO
      */
     @Override
-    public BasePageDTO<AppUserDTO> getUserList(AppUserListReqDTO appUserListReqDTO) {
+    public BasePageDTO<AppUserDTO> getUserList(AppUserListReqParam appUserListParam) {
         // 1 先把手机号和邮箱转变过来
-        appUserListReqDTO.setPhoneNumber(AESUtil.encryptHex(appUserListReqDTO.getPhoneNumber()));
-        appUserListReqDTO.setEmail(AESUtil.encryptHex(appUserListReqDTO.getEmail()));
+        appUserListParam.setPhoneNumber(AESUtil.encryptHex(appUserListParam.getPhoneNumber()));
+        appUserListParam.setEmail(AESUtil.encryptHex(appUserListParam.getEmail()));
         BasePageDTO<AppUserDTO> result = new BasePageDTO();
 
         // 2 查询总数
-        Long totals = appUserMapper.selectCount(appUserListReqDTO);
+        Long totals = appUserMapper.selectCount(appUserListParam);
         if (totals == 0) {
             result.setTotals(0);
             result.setTotalPages(0);
@@ -187,10 +214,10 @@ public class AppUserServiceImpl implements IAppUserService {
         }
 
         // 3 分页查询
-        List<AppUser> appUserList = appUserMapper.selectPage(appUserListReqDTO);
+        List<AppUser> appUserList = appUserMapper.selectPage(appUserListParam);
         result.setTotals(totals.intValue());
         result.setTotalPages(
-                BasePageDTO.calculateTotalPages(totals, appUserListReqDTO.getPageSize())
+                BasePageDTO.calculateTotalPages(totals, appUserListParam.getPageSize())
         );
         // 4 超页
         if (CollectionUtils.isEmpty(appUserList)) {

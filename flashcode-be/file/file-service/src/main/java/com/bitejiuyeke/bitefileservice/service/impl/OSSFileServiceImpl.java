@@ -41,17 +41,18 @@ public class OSSFileServiceImpl implements IFileService {
     @Autowired
     private OSSProperties ossProperties;
 
-
-    @Override
-    public FileVO upload(MultipartFile file) {
+    private FileVO upload(MultipartFile file,Long dirId) {
         try {
             InputStream inputStream = file.getInputStream();
             //获取原始的文件名
             String originalFilename = file.getOriginalFilename();
             String extName = originalFilename.substring(originalFilename.lastIndexOf(".")+1);
             //在oss中存储名字就是UUID + 文件的后缀名
-            String objectName = ossProperties.getPathPrefix() + UUID.randomUUID()+"."+extName;
-
+            String prefix = ossProperties.getPathPrefix();
+            if (StringUtils.isNotBlank(prefix) && !prefix.endsWith("/")) {
+                prefix = prefix + "/";
+            }
+            String objectName = prefix + dirId + "/" + UUID.randomUUID() + "." + extName;
             ObjectMetadata objectMetadata = new ObjectMetadata();
             // set public read
             objectMetadata.setObjectAcl(CannedAccessControlList.PublicRead);
@@ -76,7 +77,14 @@ public class OSSFileServiceImpl implements IFileService {
             throw new ServiceException(ResultCode.OSS_UPLOAD_FAILED);
         }
     }
-
+    @Override
+    public FileVO uploadAppScreenShot(MultipartFile file,Long appId) {
+        return upload(file,appId);
+    }
+    @Override
+    public FileVO uploadUserAvatar(MultipartFile file,Long userId) {
+        return upload(file,userId);
+    }
     @Override
     public SignVO getSign() {
         try {

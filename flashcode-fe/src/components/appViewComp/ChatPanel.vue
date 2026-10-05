@@ -100,7 +100,7 @@
           </div>
           <!-- 普通消息 -->
           <div v-else>
-            <div class="message-text" v-html="formatMessageText(message.content)"></div>
+            <div class="message-text" v-html="formatMessageText(displayContent(message))"></div>
           </div>
         </div>
       </div>
@@ -210,6 +210,20 @@ const buildGenerateAppFormData = (requirement, appId) => {
   return formData;
 };
 
+const isSourceCode = (content) => {
+  if (!content) return false;
+  const trimmed = content.trimStart();
+  return trimmed.startsWith('APP_TYPE=') || trimmed.startsWith('FILE:') || content.includes('\nFILE:');
+};
+
+const displayContent = (message) => {
+  const content = message?.content || '';
+  if (!isSourceCode(content)) {
+    return content;
+  }
+  return message.msgRole === 0 ? '已提交代码修改' : '应用已更新';
+};
+
 /**
  * 判断是否是系统内部消息
  * 系统消息包含特定的标记，这些消息不应该显示给用户
@@ -297,6 +311,9 @@ const isRequirementDocument = (message, index) => {
   }
 
   const content = message.content;
+  if (isSourceCode(content)) {
+    return false;
+  }
   const contentLength = content.length;
 
   // 检查是否包含Markdown格式（标题、列表等）

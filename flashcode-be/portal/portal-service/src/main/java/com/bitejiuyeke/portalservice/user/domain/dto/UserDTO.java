@@ -19,13 +19,30 @@ public class UserDTO extends LoginUserDTO {
     private String avatar;
 
     /**
+     * 昵称
+     */
+    private String nickName;
+
+    /**
+     * 手机号
+     */
+    private String phoneNumber;
+
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
      * 对象转换
      * @return
      */
     public UserVo convertToVO() {
         UserVo userVo = new UserVo();
         BeanUtils.copyProperties(this, userVo);
-        userVo.setNickName(this.getUserName());
+        if (userVo.getNickName() == null || userVo.getNickName().isBlank()) {
+            userVo.setNickName(this.getUserName());
+        }
         return userVo;
     }
 }

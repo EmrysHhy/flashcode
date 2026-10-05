@@ -1,7 +1,7 @@
 package com.bitejiuyeke.portalservice.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqDTO;
+import com.bitejiuyeke.biteadminapi.appuser.domain.dto.AppUserListReqParam;
 import com.bitejiuyeke.portalservice.user.domain.entity.AppUser;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -37,15 +37,15 @@ public interface AppUserMapper extends BaseMapper<AppUser> {
 
     /**
      * 查询总数
-     * @param appUserListReqDTO 查询C端用户DTO
+     * @param appUserListParam 查询C端用户DTO
      * @return 用户总数
      */
-    Long selectCount(AppUserListReqDTO appUserListReqDTO);
+    Long selectCount(AppUserListReqParam appUserListParam);
 
     /**
      * 分页查询C端用户
-     * @param appUserListReqDTO 查询C端用户DTO
+     * @param appUserListParam 查询C端用户DTO
      * @return 用户列表
      */
-    List<AppUser> selectPage(AppUserListReqDTO appUserListReqDTO);
+    List<AppUser> selectPage(AppUserListReqParam appUserListParam);
 }

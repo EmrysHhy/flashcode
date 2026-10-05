@@ -1,6 +1,6 @@
 package com.bitejiuyeke.portalservice.user.service;
 
-import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqDTO;
+import com.bitejiuyeke.biteadminapi.appuser.domain.dto.UserEditReqParam;
 import com.bitejiuyeke.bitecommonsecurity.domain.dto.TokenDTO;
 import com.bitejiuyeke.portalservice.user.domain.dto.LoginDTO;
 import com.bitejiuyeke.portalservice.user.domain.dto.UserDTO;
@@ -14,7 +14,7 @@ public interface ILoginUserService {
 
     String sendCode(String account);
 
-    void edit(UserEditReqDTO userEditReqDTO);
+    void edit(UserEditReqParam userEditParam);
 
     UserDTO getLoginUser();
 
