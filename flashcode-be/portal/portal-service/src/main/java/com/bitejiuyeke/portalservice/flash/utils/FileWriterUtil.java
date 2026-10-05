@@ -197,6 +197,30 @@ public class FileWriterUtil {
     }
 
     /**
+     * 发布容器的 nginx 读取 user-deploy/{appId}/dist。
+     * 构建产物在 user-preview/{appId}/dist，发布时再复制过去。
+     */
+    public static void copyPreviewDistToDeploy(Long appId, Path deployDir) {
+        if (appId == null || deployDir == null) {
+            throw new ServiceException("发布目录不能为空");
+        }
+        Path source = Paths.get(FlashcodeConstant.USER_PREVIEW_DIR, String.valueOf(appId), "dist")
+                .toAbsolutePath()
+                .normalize();
+        Path target = deployDir.toAbsolutePath().normalize().resolve("dist");
+        if (!Files.isDirectory(source)) {
+            throw new ServiceException("预览产物不存在，无法发布");
+        }
+        try {
+            copyDirectory(source, target);
+            log.info("dist 已复制到发布目录, src={}, dest={}", source, target);
+        } catch (IOException e) {
+            log.error("复制 dist 到发布目录失败, appId={}", appId, e);
+            throw new ServiceException("复制发布文件失败");
+        }
+    }
+
+    /**
      * 把 source 目录里的内容拷到 target。
      * user-code 和 user-preview 往往不在同一块盘/挂载上，Files.move 会失败，所以按文件树复制。
      */

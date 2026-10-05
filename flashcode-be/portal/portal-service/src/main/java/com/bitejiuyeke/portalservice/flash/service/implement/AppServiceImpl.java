@@ -337,6 +337,7 @@ public class AppServiceImpl implements IAppService {
         }
         if (Integer.valueOf(DeployStatusEnum.DEPLOYED.getValue()).equals(app.getDeployStatus())) {
             log.info("应用已经部署完毕,直接返回URL");
+            FileWriterUtil.copyPreviewDistToDeploy(appId, deployAppDir(appId));
             return app.getAppUrl();
         }
         Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
@@ -362,6 +363,7 @@ public class AppServiceImpl implements IAppService {
         // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
+        FileWriterUtil.copyPreviewDistToDeploy(appId, deployAppDir(appId));
         log.info("发布成功,请访问url:{}",url);
         return url;
     }
@@ -398,14 +400,21 @@ public class AppServiceImpl implements IAppService {
     }
 
     /**
+     * 门户容器里的 /workspace/user-deploy 就是宿主机 user-deploy。
+     */
+    private Path deployAppDir(Long appId) {
+        Path localParent = Path.of(deployLocalDir);
+        if (Files.isDirectory(localParent)) {
+            return localParent.resolve(String.valueOf(appId));
+        }
+        return Path.of(deployPath, String.valueOf(appId));
+    }
+
+    /**
      * 创建该应用的发布目录。门户跑在容器里时写挂载目录，否则写宿主机目录。
      */
     private void prepareDeployDir(Long appId) {
-        String appDirName = String.valueOf(appId);
-        Path localParent = Path.of(deployLocalDir);
-        Path target = Files.isDirectory(localParent)
-                ? localParent.resolve(appDirName)
-                : Path.of(deployPath, appDirName);
+        Path target = deployAppDir(appId);
         try {
             Files.createDirectories(target);
         } catch (IOException e) {
