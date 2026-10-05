@@ -57,7 +57,7 @@ public class AppGenerationAgent implements NodeAction {
             String appCode = generateCode(appId,
                     state.value(FlashcodeConstant.USER_ID, Long.class).orElse(null),
                     requirement, image);
-            log.info("\n生成应用代码完成，appId: {}, appCode: {}\n", appId, appCode);
+            log.info("生成应用代码完成，appId: {}", appId);
 
             Map<String, String> files = AnalysisUtil.getFiles(appCode);
             AppTypesEnum appType = AnalysisUtil.resolveType(appCode, files);

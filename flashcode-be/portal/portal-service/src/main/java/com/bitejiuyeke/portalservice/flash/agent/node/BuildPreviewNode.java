@@ -41,7 +41,7 @@ public class BuildPreviewNode implements NodeAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-        log.info("\n开始构建预览，appId: {}\n", state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null));
+        log.info("开始构建预览，appId: {}", state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null));
         if (!state.value(FlashcodeConstant.APP_IS_GENERATE, Boolean.class).orElse(false)) {
             log.error("应用代码未生成，无法构建预览，appId: {}", state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null));
             throw new ServiceException("应用代码未生成，无法构建预览,请重试或者联系管理员");

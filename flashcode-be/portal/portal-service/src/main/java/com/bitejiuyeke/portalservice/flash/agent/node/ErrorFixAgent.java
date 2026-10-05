@@ -37,7 +37,7 @@ public class ErrorFixAgent implements NodeAction {
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         Long appId = state.value(FlashcodeConstant.APP_ID, Long.class).orElse(null);
-        log.info("\n开始修复应用代码，appId: {}\n", appId);
+        log.info("开始修复应用代码，appId: {}", appId);
         try {
             if(!state.value(FlashcodeConstant.APP_IS_BUILD,Boolean.class).orElse(false)){
                 log.warn("应用构建失败，appId: {}", appId);

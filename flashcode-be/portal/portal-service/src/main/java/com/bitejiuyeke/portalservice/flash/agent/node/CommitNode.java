@@ -35,7 +35,7 @@ public class CommitNode implements NodeAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-        log.info("\n开始推送代码并删除本地文件\n");
+        log.info("开始推送代码并删除本地文件");
         int commitAttempt = state.value(FlashcodeConstant.COMMIT_ATTEMPT, Integer.class).orElse(0) + 1;
         try{
             String photoPathStr = state.value(FlashcodeConstant.PHOTO_PATH, String.class).orElse(null);
