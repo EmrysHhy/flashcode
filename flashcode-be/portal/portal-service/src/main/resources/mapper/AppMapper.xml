@@ -35,7 +35,8 @@
                a.app_type,
                a.app_name,
                a.app_desc,
-               a.app_screenshot
+               a.app_screenshot,
+               a.app_url
         FROM app a
         LEFT JOIN app_user u ON u.id = a.user_id
         WHERE a.deploy_status = #{deployStatus}

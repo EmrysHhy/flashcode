@@ -496,16 +496,16 @@ const handleSendMessage = async () => {
         newContent: contentToSend,
       });
 
-      // 将加载消息替换为成功消息
-      chatHistory.value[loadingMessageIndex] = {
-        msgRole: 1,
-        content: '应用修改成功！',
-        chatTime: new Date().toISOString(),
-        isLoading: false
-      };
-
       if (result && result.url) {
+        chatHistory.value[loadingMessageIndex] = {
+          msgRole: 1,
+          content: '应用修改成功',
+          chatTime: new Date().toISOString(),
+          isLoading: false
+        };
         emit('update:appDetail', { ...props.appDetail, previewUrl: result.url });
+      } else {
+        chatHistory.value.splice(loadingMessageIndex, 1);
       }
       // 不论是否返回 previewUrl，都刷新预览并清空选中元素
       emit('refresh-preview', true);

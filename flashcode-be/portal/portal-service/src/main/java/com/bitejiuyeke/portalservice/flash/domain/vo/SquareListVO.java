@@ -35,5 +35,9 @@ public class SquareListVO {
      * 应用截图
      */
     private String appScreenshot;
+    /**
+     * 发布后的访问地址
+     */
+    private String appUrl;
 
 }

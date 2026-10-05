@@ -263,7 +263,7 @@ public class AppServiceImpl implements IAppService {
         generateAppDTO.setAppId(appId);
         generateAppDTO.setAppType(appType);
         generateAppDTO.setUrl(url);
-        log.info("========代码编辑成功=======");
+        log.info("代码编辑成功");
         return generateAppDTO;
     }
     /**
@@ -320,7 +320,7 @@ public class AppServiceImpl implements IAppService {
         generateAppDTO.setAppId(appId);
         generateAppDTO.setAppType(appType);
         generateAppDTO.setUrl(url);
-        log.info("=====代码编辑成功=====");
+        log.info("代码编辑成功");
         return generateAppDTO;
     }
 
@@ -362,7 +362,7 @@ public class AppServiceImpl implements IAppService {
         // 1.根据类型编译打包    //VUE3进入 build->dist   //VUE3+Spring -> jar + dist
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
-        log.info("=====发布成功,请访问url:{}=====",url);
+        log.info("发布成功,请访问url:{}",url);
         return url;
     }
 

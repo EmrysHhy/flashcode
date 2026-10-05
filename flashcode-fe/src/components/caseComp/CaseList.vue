@@ -53,18 +53,17 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import { fetchAppList } from '@/apis';
 import { useUserStore } from '@/stores/user';
 import { uniqueBy } from '@/utils/arrayUtils';
 import Login from '@/components/Login.vue';
 
-const router = useRouter();
 const userStore = useUserStore();
 
 // 登录相关
 const showLoginModal = ref(false);
-const pendingAppId = ref(null); // 待跳转的应用ID
+const pendingApp = ref(null); // 待打开的已发布应用
 
 const categories = ref(['全部', 'HTML', 'VUE3', 'VUE3+Spring']);
 const activeCategory = ref('全部');
@@ -153,31 +152,33 @@ const formatDate = (item) => {
     return '';
 };
 
+// 广场里的应用都已发布，直接在新标签页打开可用地址，不进编辑页
+const openApp = (item) => {
+    if (!item?.appUrl) {
+        ElMessage.warning('该应用暂时无法访问');
+        return;
+    }
+    window.open(item.appUrl, '_blank');
+};
+
 const previewApp = (item) => {
     // 检查是否已登录
     if (!userStore.isLoggedIn) {
-        // 未登录，保存应用ID并显示登录窗口
-        pendingAppId.value = item.id;
+        // 未登录，记住这条案例并显示登录窗口
+        pendingApp.value = item;
         showLoginModal.value = true;
         return;
     }
 
-    // 已登录，直接跳转到应用详情页
-    router.push({
-        name: 'app',
-        params: { id: item.id }
-    });
+    openApp(item);
 };
 
 // 登录成功后的处理
 const handleLoginSuccess = () => {
-    // 如果有待跳转的应用ID，登录成功后跳转
-    if (pendingAppId.value) {
-        router.push({
-            name: 'app',
-            params: { id: pendingAppId.value }
-        });
-        pendingAppId.value = null;
+    // 如果有待打开的应用，登录成功后打开
+    if (pendingApp.value) {
+        openApp(pendingApp.value);
+        pendingApp.value = null;
     }
 };
 

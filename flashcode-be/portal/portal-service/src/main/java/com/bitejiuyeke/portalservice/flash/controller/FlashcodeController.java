@@ -36,27 +36,12 @@ public class FlashcodeController {
     IRequirementService flashCodeService;
     @Autowired
     IAppService appService;
-    @Autowired
-    ChatClient chatClient;
-    @Autowired
-    VectorStore vectorStore;
-
-    @GetMapping("/test")
-    public R<String> test(@RequestParam String input, @RequestParam String conversationId) {
-        String content = ChatContentSupport.collect(chatClient.prompt()
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
-
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                        .searchRequest(SearchRequest.builder().build())
-                        .build())
-                .user(input));
-        return R.ok(content);
-    }
 
     @PostMapping("/requirement/generate")
     public R<RequirementVO> RequestDocController(String input){
         log.info("收到生成需求文档请求，输入内容：{}", input);
         RequirementDTO requirementDTO = flashCodeService.generateRequirement(input);
+        log.info("生成需求文档成功");
         return R.ok(requirementDTO.convertToVO());
     }
    /* @PostMapping("/generate")

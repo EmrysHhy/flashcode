@@ -414,20 +414,32 @@ const handleOpenInNewWindow = () => {
 };
 
 // 发布应用
-// 调用发布 API，获取部署 URL 并在新窗口打开
+// 点击时先打开新标签，成功后再跳到已发布页面。等接口返回再 window.open 会被浏览器拦截
 const handleDeploy = async () => {
   if (!props.appDetail?.id || isDeploying.value) {
     return;
   }
 
+  const popup = window.open('', '_blank');
   try {
     isDeploying.value = true;
     const data = await deployApp(props.appDetail.id);
-    const deployUrl = typeof data === 'string' ? data : data?.url;
-    if (deployUrl) {
-      window.open(deployUrl, '_blank');
+    let deployUrl = typeof data === 'string' ? data : data?.url;
+    if (deployUrl && !/^https?:\/\//i.test(deployUrl)) {
+      deployUrl = `http://${deployUrl}`;
     }
+    if (!deployUrl) {
+      popup?.close();
+      alert('发布失败：未获取到访问地址');
+      return;
+    }
+    if (popup) {
+      popup.location.href = deployUrl;
+      return;
+    }
+    window.open(deployUrl, '_blank');
   } catch (err) {
+    popup?.close();
     console.error('发布应用失败:', err);
     alert(`发布失败：${err.message || '请稍后重试'}`);
   } finally {
