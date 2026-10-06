@@ -19,6 +19,7 @@
         <module>gateway</module>
         <module>file</module>
         <module>portal</module>
+        <module>image-mcp</module>
     </modules>
 
     <properties>

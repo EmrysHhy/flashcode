@@ -6,6 +6,10 @@ spring:
     name: bite-portal
   profiles:
     active: ${RUN_ENV}
+  ai:
+    mcp:
+      client:
+        enabled: false
   cloud:
     nacos:
       discovery:

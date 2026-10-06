@@ -5,6 +5,7 @@ import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
 import com.bitejiuyeke.portalservice.flash.agent.MultiAgentWorkFlow;
 import com.bitejiuyeke.portalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.portalservice.flash.service.IGiteeService;
+import com.bitejiuyeke.portalservice.flash.service.implement.ImageSearchService;
 import com.github.dockerjava.api.DockerClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +47,8 @@ public class MultiAgentConfig {
                                                  FileFeignClient fileFeignClient,
                                                  DockerClient dockerClient,
                                                  ScheduledExecutorService scheduledExecutorService,
-                                                 MeterRegistry meterRegistry) {
+                                                 MeterRegistry meterRegistry,
+                                                 ImageSearchService imageSearchService) {
         return new MultiAgentWorkFlow(chatClient,
                 vectorStore,
                 appMapper,
@@ -58,7 +60,8 @@ public class MultiAgentConfig {
                 visionModel,
                 nginxPre,
                 scheduledExecutorService,
-                meterRegistry);
+                meterRegistry,
+                imageSearchService);
     }
 
     /**

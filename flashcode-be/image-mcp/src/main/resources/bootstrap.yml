@@ -1,0 +1,25 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: image-mcp
+  profiles:
+    active: ${RUN_ENV}
+  cloud:
+    nacos:
+      discovery:
+        username: nacos
+        password: bite@123
+        namespace: flashcode-${RUN_ENV}
+        server-addr: ${NACOS_ADDR}
+      config:
+        username: nacos
+        password: bite@123
+        namespace: flashcode-${RUN_ENV}
+        server-addr: ${NACOS_ADDR}
+        file-extension: yaml
+
+logging:
+  pattern:
+    console: '[%thread] %-5level %logger{36} - %msg%n'

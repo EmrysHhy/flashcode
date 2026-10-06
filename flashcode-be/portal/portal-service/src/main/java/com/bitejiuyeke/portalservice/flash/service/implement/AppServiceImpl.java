@@ -7,6 +7,7 @@ import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.portalservice.flash.domain.dto.require.AppEditParam;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.GenerateAppDTO;
+import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
 import com.bitejiuyeke.portalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.portalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.portalservice.flash.enums.AppTypesEnum;
@@ -41,6 +42,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -66,6 +68,8 @@ public class AppServiceImpl implements IAppService {
     DockerClient dockerClient;
     @Autowired
     VectorStore vectorStore;
+    @Autowired
+    ImageSearchService imageSearchService;
     @Autowired
     Executor threadPoolTaskExecutor;
     @Value("${flashcode.delete-code-expire:12}")
@@ -188,9 +192,9 @@ public class AppServiceImpl implements IAppService {
     }
 
     /**
-     * 修改应用代码
-     * @param appEditParam
-     * @return
+     * 可视化编辑：只改用户点中的那一个 DOM 元素。
+     * 规则：按修改说明搜配图后写入提示词；不把整份源码写入聊天记忆；
+     * 模型必须仍按 FILE: 完整文件输出，解析后合并进原 codes 再写盘、预览。
      */
     @Override
     public GenerateAppDTO appEdit(AppEditParam appEditParam) {
@@ -207,8 +211,11 @@ public class AppServiceImpl implements IAppService {
             giteeService.pull(appId);
         }
         Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
-        String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(), appEditParam.getNewContent());
-        String editAppSysPrompt = getEditAppSysPrompt(appEditParam.getElementSelector(), appEditParam.getNewContent());
+        List<StockImageDTO> stockImages = imageSearchService.searchForRequirement(appEditParam.getNewContent());
+        String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(),
+                appEditParam.getNewContent(), stockImages);
+        String editAppSysPrompt = getEditAppSysPrompt(appEditParam.getElementSelector(),
+                appEditParam.getNewContent(), stockImages != null && !stockImages.isEmpty());
         //获得大模型修改之后的代码
         // 不写入会话记忆。用户提示词里带了全部源码，chat_history.content 装不下，下一轮也会把源码再喂给模型
         LoginUserDTO loginUser = tokenService.getLoginUser();
@@ -221,7 +228,7 @@ public class AppServiceImpl implements IAppService {
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
                         .build()));
-        log.info("修改应用代码完成，appId: {}, appCode: {}", appId, appCode);
+        log.info("修改应用代码完成，appId: {}", appId);
 
         Map<String, String> editedFiles = AnalysisUtil.getFiles(appCode);
         if (editedFiles.isEmpty()) {
@@ -547,13 +554,12 @@ public class AppServiceImpl implements IAppService {
     }
 
     /**
-     * 获取编辑应用的用户提示词
-     * @param codes
-     * @param elementSelector
-     * @param newContent
-     * @return
+     * 编辑用户提示词。
+     * 规则：写明 CSS 选择器和修改要求；有配图时列出【可用图片】，换图只能用这些 url；
+     * 后面附全部源码，模型只对目标元素做最小修改。
      */
-    private String getEditAppUserPrompt(Map<String, String> codes, String elementSelector, String newContent) {
+    private String getEditAppUserPrompt(Map<String, String> codes, String elementSelector, String newContent,
+                                        List<StockImageDTO> stockImages) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("【精确修改请求】\n\n");
         prompt.append("目标 CSS 选择器（已精确定位，无需分析）：\n");
@@ -563,6 +569,15 @@ public class AppServiceImpl implements IAppService {
         if (elementSelector != null && elementSelector.contains(":nth-child(")) {
             prompt.append("⚠ 注意：该选择器包含 nth-child，表示这是列表中的一个单独元素。\n");
             prompt.append("你必须确保其他列表项在任何方面都不发生变化。\n");
+        }
+        if (stockImages != null && !stockImages.isEmpty()) {
+            prompt.append("【可用图片】需要换图时只能使用下列地址，写在 img 的 src 中：\n");
+            for (StockImageDTO hit : stockImages) {
+                prompt.append("- ")
+                        .append(hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt())
+                        .append(": ").append(hit.url()).append('\n');
+            }
+            prompt.append('\n');
         }
         prompt.append("以下是完整代码文件，请只对目标元素进行最小必要修改：\n\n");
         if (codes != null) {
@@ -577,9 +592,11 @@ public class AppServiceImpl implements IAppService {
     }
 
     /**
-     * 编辑代码系统提示词
+     * 编辑系统提示词。
+     * 规则：只改选择器命中的单一元素，禁止改兄弟/全局样式；nth-child 只动第 n 项；
+     * 换图必须用「可用图片」URL；输出仍是 FILE: 相对路径 + 被改文件的完整内容。
      */
-    private String getEditAppSysPrompt(String elementSelector, String newContent) {
+    private String getEditAppSysPrompt(String elementSelector, String newContent, boolean hasStockImages) {
         return String.join("\n",
                 "你是一个“精确 DOM 定点修改器”，不是代码重构器。",
                 "你的唯一任务：只修改一个已经被精确定位的 DOM 元素，其余任何内容都禁止改动。",
@@ -598,6 +615,9 @@ public class AppServiceImpl implements IAppService {
                 "2. 禁止修改任何兄弟元素、父元素或子元素。",
                 "3. 禁止新增、删除、重排任何 DOM 结构。",
                 "4. 禁止修改任何全局 CSS、公共 class 或选择器。",
+                hasStockImages
+                        ? "5. 需要更换图片时，必须使用用户提示词「可用图片」中的 URL，禁止编造地址。"
+                        : "5. 没有可用图片时不要编造无法访问的图片地址。",
                 "",
                 "====================",
                 "【nth-child 特别规则（最高优先级）】",

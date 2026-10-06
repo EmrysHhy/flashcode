@@ -4,8 +4,10 @@ import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
+import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
 import com.bitejiuyeke.portalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.portalservice.flash.mapper.AppMapper;
+import com.bitejiuyeke.portalservice.flash.service.implement.ImageSearchService;
 import com.bitejiuyeke.portalservice.flash.utils.AnalysisUtil;
 import com.bitejiuyeke.portalservice.flash.utils.ChatContentSupport;
 import com.bitejiuyeke.portalservice.flash.utils.FileWriterUtil;
@@ -19,12 +21,13 @@ import org.springframework.ai.vectorstore.VectorStore;
 
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- *
- * @author Emrys
- * content:
+ * 应用代码生成节点。
+ * 规则：先按需求文档搜配图，再让模型按固定格式吐出源码；搜图失败不阻断生成。
+ * 模型输出必须是第一行应用类型 + 若干 FILE: 代码块，由解析器写入 user-code/{appId}。
  */
 @Slf4j
 public class AppGenerationAgent implements NodeAction {
@@ -32,17 +35,25 @@ public class AppGenerationAgent implements NodeAction {
     private final VectorStore vectorStore;
     private final AppMapper appMapper;
     private final String visionModel;
+    private final ImageSearchService imageSearchService;
 
     public AppGenerationAgent(ChatClient chatClient,
                               AppMapper appMapper,
                               VectorStore vectorStore,
-                              String visionModel) {
+                              String visionModel,
+                              ImageSearchService imageSearchService) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
         this.visionModel = visionModel;
+        this.imageSearchService = imageSearchService;
     }
 
+    /**
+     * 生成入口。
+     * 规则：参考图只还原布局；网上配图由 ImageSearchService 预取后写入用户提示词；
+     * 解析失败或写盘失败记 GENERATE_ERROR_MESSAGE，不在这里抛给调用方。
+     */
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         int generateAttempt = state.value(FlashcodeConstant.GENERATE_ATTEMPT, Integer.class).orElse(0) + 1;
@@ -54,9 +65,11 @@ public class AppGenerationAgent implements NodeAction {
             }
             Path image = VisionChatSupport.resolveImage(
                     state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
+            List<StockImageDTO> stockImages = imageSearchService.searchForRequirement(requirement);
+            log.info("搜图结果 appId={}, count={}", appId, stockImages == null ? 0 : stockImages.size());
             String appCode = generateCode(appId,
                     state.value(FlashcodeConstant.USER_ID, Long.class).orElse(null),
-                    requirement, image);
+                    requirement, image, stockImages);
             log.info("生成应用代码完成，appId: {}", appId);
 
             Map<String, String> files = AnalysisUtil.getFiles(appCode);
@@ -89,11 +102,18 @@ public class AppGenerationAgent implements NodeAction {
 
     }
 
-    private String generateCode(Long appId, Long userId, String requirement, Path image) {
+    /**
+     * 调用大模型生成源码。
+     * 规则：不把搜图工具挂到 ChatClient，避免 stream 过程中调工具拿不到结果；
+     * 有参考图时切视觉模型；输出必须能被 AnalysisUtil 解析。
+     */
+    private String generateCode(Long appId, Long userId, String requirement, Path image,
+                               List<StockImageDTO> stockImages) {
+        boolean hasStock = stockImages != null && !stockImages.isEmpty();
         var spec = chatClient.prompt()
-                .system(getSysPrompt(appId))
+                .system(getSysPrompt(appId, hasStock))
                 .user(u -> {
-                    u.text(getUserPrompt(requirement, image != null));
+                    u.text(getUserPrompt(requirement, image != null, stockImages));
                     VisionChatSupport.attachImage(u, image);
                 })
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, String.valueOf(appId))
@@ -110,11 +130,11 @@ public class AppGenerationAgent implements NodeAction {
     }
 
     /**
-     * 进一步封装用户提示词
-     * @param requirement 用户需求
-     * @return 封装后的用户提示词
+     * 用户提示词。
+     * 规则：正文是需求文档；有用户上传参考图时附加【参考图】说明；
+     * 有搜到的配图时附加【可用图片】url 列表，模型只能把这些地址写进 img src。
      */
-    private String getUserPrompt(String requirement, boolean hasImage) {
+    private String getUserPrompt(String requirement, boolean hasImage, List<StockImageDTO> stockImages) {
         String prompt = String.join("\n",
                 "【用户需求文档】 ",
                 requirement,
@@ -123,12 +143,23 @@ public class AppGenerationAgent implements NodeAction {
         if (hasImage) {
             prompt += "\n【参考图】请根据用户上传的参考图还原布局、配色与主要模块；与需求文档冲突时以需求文档为准。\n";
         }
+        if (stockImages != null && !stockImages.isEmpty()) {
+            StringBuilder images = new StringBuilder("\n【可用图片】页面配图只能使用下列地址，写在 img 的 src 中：\n");
+            for (StockImageDTO hit : stockImages) {
+                images.append("- ").append(hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt())
+                        .append(": ").append(hit.url()).append('\n');
+            }
+            prompt += images;
+        }
         return prompt;
     }
     /**
-     * 系统提示词
+     * 系统提示词。
+     * 规则：只能选 Html / Vue3 / Spring_Vue3；禁止复杂鉴权和外部存储；
+     * 有配图必须用「可用图片」URL，没有则用色块/SVG，禁止编造地址；
+     * 输出第一行是类型，随后每个文件 FILE: 相对路径 + 完整代码块，禁止省略。
      */
-    private String getSysPrompt(Long appId) {
+    private String getSysPrompt(Long appId, boolean hasStockImages) {
         return String.join("\n",
                 "你是资深全栈工程师和架构师，精通现代 Web 开发。你的目标是严格依据用户需求文档生成完整、可运行、代码整洁且页面美观的应用代码。",
                 "### 应用类型决策",
@@ -139,6 +170,9 @@ public class AppGenerationAgent implements NodeAction {
                 "### 通用生成规范",
                 "- **复杂逻辑**：生成的所有应用不要包含复杂逻辑（例如：身份认证等）。",
                 "- **数据存储**：生成的所有应用数据存储不依赖任何第三方存储机制。",
+                hasStockImages
+                        ? "- **配图**：页面图片必须使用用户提示词「可用图片」中给出的 URL，写在 img 的 src 中。禁止占位图或编造地址。"
+                        : "- **配图**：没有可用图片时用 CSS 色块或 SVG 绘制，禁止编造无法访问的图片地址。",
                 "### 类型详细规范",
                 "#### 1. 单个 HTML 页面（" + AppTypesEnum.Html.name() + "）",
                 "- **结构**：仅输出一个 `index.html` 文件。",

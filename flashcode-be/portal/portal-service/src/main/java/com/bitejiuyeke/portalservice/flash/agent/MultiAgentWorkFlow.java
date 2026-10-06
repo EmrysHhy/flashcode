@@ -23,6 +23,7 @@ import com.bitejiuyeke.portalservice.flash.domain.dto.result.GenerateAppDTO;
 import com.bitejiuyeke.portalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.portalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.portalservice.flash.service.IGiteeService;
+import com.bitejiuyeke.portalservice.flash.service.implement.ImageSearchService;
 import com.bitejiuyeke.portalservice.flash.utils.FileWriterUtil;
 import com.github.dockerjava.api.DockerClient;
 import io.micrometer.core.instrument.Gauge;
@@ -94,6 +95,7 @@ public class MultiAgentWorkFlow {
     private final String nginxPre;
     private final ScheduledExecutorService scheduledExecutorService;
     private final MeterRegistry meterRegistry;
+    private final ImageSearchService imageSearchService;
     /** 每个 appId 最近一次生成耗时（秒），供 Prometheus 仪表读取。 */
     private final ConcurrentHashMap<String, AtomicReference<Double>> lastGenerateSeconds = new ConcurrentHashMap<>();
 
@@ -115,7 +117,8 @@ public class MultiAgentWorkFlow {
                               String visionModel,
                               String nginxPre,
                               ScheduledExecutorService scheduledExecutorService,
-                              MeterRegistry meterRegistry) {
+                              MeterRegistry meterRegistry,
+                              ImageSearchService imageSearchService) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
@@ -128,6 +131,7 @@ public class MultiAgentWorkFlow {
         this.nginxPre = nginxPre;
         this.scheduledExecutorService = scheduledExecutorService;
         this.meterRegistry = meterRegistry;
+        this.imageSearchService = imageSearchService;
         this.stateGraph = new StateGraph(keyStrategyFactory());
         addNode();
         addEdge();
@@ -372,7 +376,7 @@ public class MultiAgentWorkFlow {
     private void addNode() {
         try {
             stateGraph.addNode(ID_APP_GENERATION_AGENT,
-                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, visionModel)));
+                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, visionModel, imageSearchService)));
             stateGraph.addNode(ID_BUILD_PREVIEW_NODE,
                     AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper, nginxPre)));
             stateGraph.addNode(ID_ERROR_FIX_AGENT,
