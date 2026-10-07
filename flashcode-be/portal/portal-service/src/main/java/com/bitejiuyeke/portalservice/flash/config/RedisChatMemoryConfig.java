@@ -51,7 +51,7 @@ public class RedisChatMemoryConfig implements ChatMemory {
     public void add(String conversationId, List<Message> messages) {
         Long appId = parseAppId(conversationId);
         if (appId == null) {
-            log.warn("conversationId 不是 appId，跳过写入聊天记忆: {}", conversationId);
+            log.warn("appId为空，跳过写入聊天记忆: {}", conversationId);
             return;
         }
         String key = FlashcodeConstant.REDIS_CHAT_HISTORY_PRE + appId;
