@@ -14,13 +14,13 @@ docker compose -p flashcode -f /root/emrys-java/flashcode/deploy/dev/app/docker-
 docker compose -f /root/emrys-java/flashcode/deploy/dev/app/docker-compose-mid.yml restart -d
 
 # 最近 100 行
-docker logs --tail 100 flashcode-bite-admin-service-1
+docker logs --tail 100 flashcode-portal-service-1
 
 # portal 日志
-docker logs --tail  300 flashcode-bite-portal-service-1
+docker logs --tail  300 flashcode-portal-service-1
 
 # 持续跟踪（Ctrl+C 停）
-docker logs -f flashcode-bite-portal-service-1
+docker logs -f flashcode-portal-service-1
 
 # 只看启动成功或失败
 docker logs flashcode-bite-portal-service-1 2>&1 | grep -E 'Started BitePortal|APPLICATION FAILED'
