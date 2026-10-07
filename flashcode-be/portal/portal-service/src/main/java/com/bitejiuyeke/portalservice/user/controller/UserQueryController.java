@@ -33,6 +33,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
     @Autowired
     private ILoginUserService loginUserService;
 
+    /**
+     * 根据 openId 查询用户。
+     */
     @Override
     public R<AppUserVo> findByOpenId(String openId) {
         AppUserDTO appUserDTO = appUserService.findByOpenId(openId);
@@ -42,6 +45,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         return R.ok(appUserDTO.convertToVO());
     }
 
+    /**
+     * 根据手机号查询用户。
+     */
     @Override
     public R<AppUserVo> findByPhone(String phoneNumber) {
         AppUserDTO appUserDTO = appUserService.findByPhone(phoneNumber);
@@ -51,6 +57,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         return R.ok(appUserDTO.convertToVO());
     }
 
+    /**
+     * 根据邮箱查询用户。
+     */
     @Override
     public R<AppUserVo> findByEmail(String email) {
         AppUserDTO appUserDTO = appUserService.findByEmail(email);
@@ -60,6 +69,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         return R.ok(appUserDTO.convertToVO());
     }
 
+    /**
+     * 根据用户 ID 查询用户。
+     */
     @Override
     public R<AppUserVo> findById(Long userId) {
         AppUserDTO appUserDTO = appUserService.findById(userId);
@@ -69,6 +81,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         return R.ok(appUserDTO.convertToVO());
     }
 
+    /**
+     * 批量查询用户列表。
+     */
     @Override
     public R<List<AppUserVo>> list(List<Long> userIds) {
         List<AppUserDTO> appUserDTOList = appUserService.getUserList(userIds);
@@ -79,6 +94,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         );
     }
 
+    /**
+     * 分页查询用户列表。
+     */
     @Override
     public R<BasePageVO<AppUserVo>> list(AppUserListReqParam appUserListParam) {
         BasePageDTO<AppUserDTO> appUserDTOList = appUserService.getUserList(appUserListParam);
@@ -87,6 +105,9 @@ public class UserQueryController implements AppUserQueryFeignClient {
         return R.ok(result);
     }
 
+    /**
+     * 获取当前登录用户信息。
+     */
     @Override
     public R<UserLoginVO> getLoginUser() {
         UserVo userVo = loginUserService.getLoginUser().convertToVO();

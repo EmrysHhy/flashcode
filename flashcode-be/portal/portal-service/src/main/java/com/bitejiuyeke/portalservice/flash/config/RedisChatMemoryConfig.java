@@ -3,6 +3,7 @@ package com.bitejiuyeke.portalservice.flash.config;
 import com.bitejiuyeke.bitecommoncore.utils.BeanCopyUtil;
 import com.bitejiuyeke.bitecommonredis.service.RedisService;
 import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
+import com.bitejiuyeke.portalservice.flash.service.implement.ImageSearchService;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.RedisChatHistoryDTO;
 import com.bitejiuyeke.portalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.portalservice.flash.mapper.ChatHistoryMapper;
@@ -155,7 +156,7 @@ public class RedisChatMemoryConfig implements ChatMemory {
                 .filter(dto -> dto != null && dto.getContent() != null)
                 .map(dto -> {
                     boolean assistant = !Role.USER.getValue().equals(dto.getChatRole());
-                    String content = withoutSource(dto.getContent(), assistant);
+                    String content = ImageSearchService.hideUrls(withoutSource(dto.getContent(), assistant));
                     return assistant ? (Message) new AssistantMessage(content) : new UserMessage(content);
                 })
                 .collect(Collectors.toList());

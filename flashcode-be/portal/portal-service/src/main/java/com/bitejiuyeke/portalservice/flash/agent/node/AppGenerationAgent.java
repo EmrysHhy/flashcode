@@ -1,5 +1,6 @@
 package com.bitejiuyeke.portalservice.flash.agent.node;
 
+import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
@@ -125,32 +126,33 @@ public class AppGenerationAgent implements NodeAction {
         if (image != null) {
             log.info("带参考图生成，切换视觉模型 {}, appId={}", visionModel, appId);
             spec = spec.options(VisionChatSupport.vlOptions(visionModel));
+        } else {
+            // 配图地址只写进页面。打开多模态时通义会去下载这些地址，国内图床经常返回 url error。
+            spec = spec.options(DashScopeChatOptions.builder()
+                    .multiModel(false)
+                    .incrementalOutput(true)
+                    .enableThinking(true)
+                    .topP(0.7)
+                    .build());
         }
-        return ChatContentSupport.collect(spec);
+        return ImageSearchService.restoreImageUrls(ChatContentSupport.collect(spec), stockImages);
     }
 
     /**
      * 用户提示词。
      * 规则：正文是需求文档；有用户上传参考图时附加【参考图】说明；
-     * 有搜到的配图时附加【可用图片】url 列表，模型只能把这些地址写进 img src。
+     * 有搜到的配图时只给 IMG_1 记号，模型写完后再换回网址。
      */
     private String getUserPrompt(String requirement, boolean hasImage, List<StockImageDTO> stockImages) {
         String prompt = String.join("\n",
                 "【用户需求文档】 ",
-                requirement,
+                ImageSearchService.hideUrls(requirement),
                 "【输出要求】请严格按照系统提示的格式输出，不要添加多余解释。 "
         );
         if (hasImage) {
             prompt += "\n【参考图】请根据用户上传的参考图还原布局、配色与主要模块；与需求文档冲突时以需求文档为准。\n";
         }
-        if (stockImages != null && !stockImages.isEmpty()) {
-            StringBuilder images = new StringBuilder("\n【可用图片】页面配图只能使用下列地址，写在 img 的 src 中：\n");
-            for (StockImageDTO hit : stockImages) {
-                images.append("- ").append(hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt())
-                        .append(": ").append(hit.url()).append('\n');
-            }
-            prompt += images;
-        }
+        prompt += ImageSearchService.imageHint(stockImages);
         return prompt;
     }
     /**
@@ -171,7 +173,7 @@ public class AppGenerationAgent implements NodeAction {
                 "- **复杂逻辑**：生成的所有应用不要包含复杂逻辑（例如：身份认证等）。",
                 "- **数据存储**：生成的所有应用数据存储不依赖任何第三方存储机制。",
                 hasStockImages
-                        ? "- **配图**：页面图片必须使用用户提示词「可用图片」中给出的 URL，写在 img 的 src 中。禁止占位图或编造地址。"
+                        ? "- **配图**：页面图片的 src 必须使用用户提示词「可用图片」中的 IMG_1、IMG_2 这种记号，禁止编造网址。"
                         : "- **配图**：没有可用图片时用 CSS 色块或 SVG 绘制，禁止编造无法访问的图片地址。",
                 "### 类型详细规范",
                 "#### 1. 单个 HTML 页面（" + AppTypesEnum.Html.name() + "）",

@@ -34,39 +34,34 @@ public class VectorConfig implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         List<Document> seedDocs = List.of(
-                new Document("1", "比特就业课的课程有Java、C++、测试", Map.of(
+                new Document("1", "我学校的课程有Java、C++、测试", Map.of(
                         "type", "course",
-                        "name", "比特就业课课程介绍",
-                        "company", "bit"
+                        "name", "学校课程介绍"
                 )),
-                new Document("2", "比特就业课的老师有小宇、小李、小张", Map.of(
+                new Document("2", "我学校的老师有小宇、小李、小张", Map.of(
                         "type", "teacher",
-                        "name", "比特就业课老师介绍",
-                        "company", "bit"
+                        "name", "我学校的老师介绍"
                 )),
-                new Document("3", "比特就业课的小宇老师擅长Java、Linux.负责Java课程讲解", Map.of(
+                new Document("3", "我学校的的小宇老师擅长Java、Linux.负责Java课程讲解", Map.of(
                         "type", "teacher_detail",
-                        "name", "小宇老师介绍",
-                        "company", "bit"
+                        "name", "小宇老师介绍"
                 )),
-                new Document("4", "比特就业课的小李老师擅长C++、网络。负责C++课程讲解", Map.of(
+                new Document("4", "我学校的小李老师擅长C++、网络。负责C++课程讲解", Map.of(
                         "type", "teacher_detail",
-                        "name", "小李老师介绍",
-                        "company", "bit"
+                        "name", "小李老师介绍"
                 )),
-                new Document("5", "比特就业课的小张老师擅长测试、运维负责测试课程讲解", Map.of(
+                new Document("5", "我学校的小张老师擅长测试、运维负责测试课程讲解", Map.of(
                         "type", "teacher_detail",
-                        "name", "小张老师介绍",
-                        "company", "bit"
+                        "name", "小张老师介绍"
                 ))
         );
-        vectorStore.add(seedDocs);
         try {
+            vectorStore.add(seedDocs);
             ingestJobPdf();
+            log.info("Vector data initialized");
         } catch (Exception e) {
-            log.error("job.pdf 入库失败", e);
+            log.error("向量库初始化失败，portal 继续启动。请检查容器能否访问 https://dashscope.aliyuncs.com", e);
         }
-        log.info("Vector data initialized");
     }
 
     private void ingestJobPdf() {

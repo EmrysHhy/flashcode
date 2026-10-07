@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -212,22 +213,24 @@ public class AppServiceImpl implements IAppService {
         }
         Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
         List<StockImageDTO> stockImages = imageSearchService.searchForRequirement(appEditParam.getNewContent());
+        List<String> keptUrls = new ArrayList<>();
         String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(),
-                appEditParam.getNewContent(), stockImages);
+                appEditParam.getNewContent(), stockImages, keptUrls);
         String editAppSysPrompt = getEditAppSysPrompt(appEditParam.getElementSelector(),
                 appEditParam.getNewContent(), stockImages != null && !stockImages.isEmpty());
         //获得大模型修改之后的代码
         // 不写入会话记忆。用户提示词里带了全部源码，chat_history.content 装不下，下一轮也会把源码再喂给模型
         LoginUserDTO loginUser = tokenService.getLoginUser();
         Long userId = loginUser == null ? null : loginUser.getUserId();
-        String appCode = ChatContentSupport.collect(chatClient.prompt()
+        String appCode = ImageSearchService.unmaskUrls(ImageSearchService.restoreImageUrls(
+                ChatContentSupport.collect(chatClient.prompt()
                 .system(editAppSysPrompt)
                 .user(editAppUserPrompt)
                 .advisors(a -> a.param(FlashcodeConstant.USER_ID, userId)
                         .param(FlashcodeConstant.APP_ID, appId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
-                        .build()));
+                        .build())), stockImages), keptUrls);
         log.info("修改应用代码完成，appId: {}", appId);
 
         Map<String, String> editedFiles = AnalysisUtil.getFiles(appCode);
@@ -559,32 +562,24 @@ public class AppServiceImpl implements IAppService {
      * 后面附全部源码，模型只对目标元素做最小修改。
      */
     private String getEditAppUserPrompt(Map<String, String> codes, String elementSelector, String newContent,
-                                        List<StockImageDTO> stockImages) {
+                                        List<StockImageDTO> stockImages, List<String> keptUrls) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("【精确修改请求】\n\n");
         prompt.append("目标 CSS 选择器（已精确定位，无需分析）：\n");
         prompt.append(elementSelector).append("\n\n");
         prompt.append("修改类型：样式修改（仅作用于该元素）\n");
-        prompt.append("具体要求：").append(newContent).append("\n\n");
+        prompt.append("具体要求：").append(ImageSearchService.hideUrls(newContent)).append("\n\n");
         if (elementSelector != null && elementSelector.contains(":nth-child(")) {
             prompt.append("⚠ 注意：该选择器包含 nth-child，表示这是列表中的一个单独元素。\n");
             prompt.append("你必须确保其他列表项在任何方面都不发生变化。\n");
         }
-        if (stockImages != null && !stockImages.isEmpty()) {
-            prompt.append("【可用图片】需要换图时只能使用下列地址，写在 img 的 src 中：\n");
-            for (StockImageDTO hit : stockImages) {
-                prompt.append("- ")
-                        .append(hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt())
-                        .append(": ").append(hit.url()).append('\n');
-            }
-            prompt.append('\n');
-        }
+        prompt.append(ImageSearchService.imageHint(stockImages));
         prompt.append("以下是完整代码文件，请只对目标元素进行最小必要修改：\n\n");
         if (codes != null) {
             for (Map.Entry<String, String> entry : codes.entrySet()) {
                 prompt.append("FILE: ").append(entry.getKey()).append("\n");
                 prompt.append("```html\n");
-                prompt.append(entry.getValue() == null ? "" : entry.getValue());
+                prompt.append(ImageSearchService.maskUrls(entry.getValue(), keptUrls));
                 prompt.append("\n```\n\n");
             }
         }
@@ -616,7 +611,7 @@ public class AppServiceImpl implements IAppService {
                 "3. 禁止新增、删除、重排任何 DOM 结构。",
                 "4. 禁止修改任何全局 CSS、公共 class 或选择器。",
                 hasStockImages
-                        ? "5. 需要更换图片时，必须使用用户提示词「可用图片」中的 URL，禁止编造地址。"
+                        ? "5. 需要更换图片时，img 的 src 必须使用「可用图片」中的 IMG_1 这种记号，禁止编造网址。"
                         : "5. 没有可用图片时不要编造无法访问的图片地址。",
                 "",
                 "====================",

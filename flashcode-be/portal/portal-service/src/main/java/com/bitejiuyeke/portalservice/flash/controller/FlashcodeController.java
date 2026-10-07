@@ -44,12 +44,6 @@ public class FlashcodeController {
         log.info("生成需求文档成功");
         return R.ok(requirementDTO.convertToVO());
     }
-   /* @PostMapping("/generate")
-    public R<GenerateAppVO> appGenerate(@RequestParam Long appId, @RequestParam String requirement){
-        log.info("收到生成应用请求\nappId：{}\n需求文档：{}", appId, requirement);
-        GenerateAppDTO generateAppDTO = appService.appGenerate(appId,requirement);
-        return R.ok(generateAppDTO.convertToVO());
-    }*/
     @GetMapping("/detail")
     public R<AppDetailVO> appDetail(@RequestParam Long appId){
         log.info("收到查询应用详情请求，appId：{}", appId);

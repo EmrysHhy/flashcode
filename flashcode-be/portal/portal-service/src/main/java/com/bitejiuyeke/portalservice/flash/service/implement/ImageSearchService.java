@@ -1,5 +1,6 @@
 package com.bitejiuyeke.portalservice.flash.service.implement;
 
+import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
 import com.bitejiuyeke.portalservice.flash.utils.ChatContentSupport;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +40,7 @@ public class ImageSearchService {
     private static final int IMAGE_COUNT = 6;
     private static final String MCP_SERVICE = "image-mcp";
     private static final int CONNECT_TIMEOUT_MS = 2000;
+    private static final Pattern URL_IN_TEXT = Pattern.compile("https?://[^\\s\"'<>]+");
     private static final Pattern APP_NAME = Pattern.compile(
             "##\\s*1\\.\\s*应用名称\\s*\\r?\\n(.*?)(?=\\r?\\n\\s*##\\s*2\\.\\s*应用描述)",
             Pattern.DOTALL);
@@ -98,6 +100,9 @@ public class ImageSearchService {
                     if (hits.size() >= IMAGE_COUNT) {
                         break;
                     }
+                    if (!hit.url().startsWith("https://")) {
+                        continue;
+                    }
                     if (hits.stream().noneMatch(item -> item.url().equals(hit.url()))) {
                         hits.add(hit);
                     }
@@ -121,11 +126,17 @@ public class ImageSearchService {
     private List<String> keywordsFromModel(String requirement) {
         try {
             String text = ChatContentSupport.collect(chatClient.prompt()
+                    .options(DashScopeChatOptions.builder()
+                            .multiModel(false)
+                            .incrementalOutput(true)
+                            .enableThinking(true)
+                            .topP(0.7)
+                            .build())
                     .system("""
                             你只负责写图片搜索词。
                             根据用户内容输出 3 行中文搜图词，每行一个具体画面。
-                            不要解释，不要序号，不要代码。""")
-                    .user(requirement));
+                            不要解释，不要序号，不要代码，不要输出网址。""")
+                    .user(hideUrls(requirement)));
             return parseKeywords(text);
         } catch (Exception e) {
             log.warn("生成搜图词失败: {}", e.getMessage());
@@ -301,6 +312,82 @@ public class ImageSearchService {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * 提示词里只放 IMG_1 这种记号，避免新模型把图床地址当成要下载的图片。
+     */
+    public static String imageHint(List<StockImageDTO> images) {
+        if (images == null || images.isEmpty()) {
+            return "";
+        }
+        StringBuilder hint = new StringBuilder("\n【可用图片】配图时 img 的 src 只能写成下面的记号，不要写网址：\n");
+        for (int i = 0; i < images.size(); i++) {
+            StockImageDTO hit = images.get(i);
+            String alt = hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt();
+            hint.append("- ").append(alt).append(": IMG_").append(i + 1).append('\n');
+        }
+        return hint.toString();
+    }
+
+    /**
+     * 模型写完后，把 IMG_1 换回真实图片地址。
+     */
+    public static String restoreImageUrls(String content, List<StockImageDTO> images) {
+        if (content == null || images == null || images.isEmpty()) {
+            return content;
+        }
+        String result = content;
+        for (int i = 0; i < images.size(); i++) {
+            result = result.replace("IMG_" + (i + 1), images.get(i).url());
+        }
+        return result;
+    }
+
+    /**
+     * 发给模型前去掉正文里的网址。新模型看到 https 地址会去下载并报 url error。
+     */
+    public static String hideUrls(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        return URL_IN_TEXT.matcher(content).replaceAll("[链接]");
+    }
+
+    /**
+     * 把正文里的网址换成 KEEP_1，模型返回后再换回来。
+     */
+    public static String maskUrls(String content, List<String> kept) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        Matcher matcher = URL_IN_TEXT.matcher(content);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String url = matcher.group();
+            int index = kept.indexOf(url);
+            if (index < 0) {
+                kept.add(url);
+                index = kept.size() - 1;
+            }
+            matcher.appendReplacement(out, Matcher.quoteReplacement("KEEP_" + (index + 1)));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /**
+     * 把 KEEP_1 换回掩码前的网址。从大编号往回换，避免 KEEP_1 改到 KEEP_10。
+     */
+    public static String unmaskUrls(String content, List<String> kept) {
+        if (content == null || kept == null || kept.isEmpty()) {
+            return content;
+        }
+        String result = content;
+        for (int i = kept.size(); i >= 1; i--) {
+            result = result.replace("KEEP_" + i, kept.get(i - 1));
+        }
+        return result;
     }
 
     /**

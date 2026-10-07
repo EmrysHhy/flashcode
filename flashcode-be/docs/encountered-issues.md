@@ -180,12 +180,6 @@ Windows 检出的 `update_nginx_location.sh` 带 `\r`，bash 把 `\r` 当命令�
 4. `npm run build`：看 `CommandUtil` 打出的 stdout，再决定改提示词还是等 ErrorFix
 5. 确认 IDEA 打开的是哪一份 `flashcode` 工程
 
-常用命令：
-
-```bash
-docker logs --tail 300 flashcode-bite-portal-service-1
-docker inspect -f '{{.State.Health.Status}}' flashcode-milvus-standalone
-```
 
 
 

@@ -38,6 +38,9 @@ public class UserLoginController implements AppUserLoginFeignClient {
     @Autowired
     private FileFeignClient fileFeignClient;
 
+    /**
+     * 使用微信登录。
+     */
     @Override
     public R<TokenVO> login(WechatLoginReqParam wechatLoginParam) {
         WechatLoginDTO wechatLoginDTO = new WechatLoginDTO();
@@ -45,6 +48,9 @@ public class UserLoginController implements AppUserLoginFeignClient {
         return R.ok(userService.login(wechatLoginDTO).convertToVo());
     }
 
+    /**
+     * 使用验证码登录。
+     */
     @Override
     public R<TokenVO> login(CodeLoginReqParam codeLoginParam) {
         CodeLoginDTO codeLoginDTO = new CodeLoginDTO();
@@ -54,6 +60,9 @@ public class UserLoginController implements AppUserLoginFeignClient {
         return R.ok(userService.login(codeLoginDTO).convertToVo());
     }
 
+    /**
+     * 发送验证码。
+     */
     @Override
     public R<String> sendCode(String account, String email) {
         String target = StringUtils.isNotBlank(account) ? account : email;
@@ -61,18 +70,27 @@ public class UserLoginController implements AppUserLoginFeignClient {
         return R.ok(userService.sendCode(target));
     }
 
+    /**
+     * 用户退出登录。
+     */
     @Override
     public R<Void> logout() {
         userService.logout();
         return R.ok();
     }
 
+    /**
+     * 编辑用户信息。
+     */
     @Override
     public R<Void> edit(UserEditReqParam userEditParam) {
         userService.edit(userEditParam);
         return R.ok();
     }
 
+    /**
+     * 更新用户头像。
+     */
     @Override
     public R<String> updateAvatar(MultipartFile file) {
         if (file == null || file.isEmpty()) {
