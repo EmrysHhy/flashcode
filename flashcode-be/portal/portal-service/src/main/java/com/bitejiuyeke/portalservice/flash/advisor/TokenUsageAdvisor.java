@@ -38,7 +38,7 @@ public class TokenUsageAdvisor implements BaseAdvisor {
     private MeterRegistry meterRegistry;
     @Autowired
     private AiModelWindowProperties modelWindows;
-    @Value("${spring.ai.dashscope.chat.options.model:qwen3-coder-plus}")
+    @Value("${spring.ai.dashscope.chat.options.model:qwen3.8-max}")
     private String defaultChatModel;
 
     /**
