@@ -16,6 +16,15 @@ public interface IFileService {
     FileVO uploadAppScreenShot(MultipartFile file, Long appId);
 
     /**
+     * 上传应用配图。目录 app/{appId}，与 Nacos pathPrefix 拼成 project/flashcode/app/{appId}/。
+     *
+     * @param file 图片文件
+     * @param appId 应用 ID
+     * @return 文件地址
+     */
+    FileVO uploadStockImage(MultipartFile file, Long appId);
+
+    /**
      * 上传用户头像
      *
      * @param file 头像文件

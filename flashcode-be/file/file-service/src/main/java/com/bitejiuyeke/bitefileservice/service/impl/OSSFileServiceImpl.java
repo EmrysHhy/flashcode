@@ -83,6 +83,11 @@ public class OSSFileServiceImpl implements IFileService {
     }
 
     @Override
+    public FileVO uploadStockImage(MultipartFile file, Long appId) {
+        return upload(file, "app/" + appId);
+    }
+
+    @Override
     public FileVO uploadUserAvatar(MultipartFile file, Long userId) {
         return upload(file, "user/" + userId);
     }

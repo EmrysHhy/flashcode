@@ -28,6 +28,16 @@ public interface FileFeignClient {
     R<FileVO> uploadAppScreenShot(@RequestPart("file") MultipartFile file, @RequestParam("appId") Long appId);
 
     /**
+     * 上传应用配图。对象键为 pathPrefix + app/{appId}/{uuid}.ext，公开读。
+     *
+     * @param file 图片文件
+     * @param appId 应用 ID
+     * @return 文件 URL 与路径
+     */
+    @PostMapping(value = "/upload/stock", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    R<FileVO> uploadStockImage(@RequestPart("file") MultipartFile file, @RequestParam("appId") Long appId);
+
+    /**
      * 上传用户头像
      *
      * @param file 头像文件
