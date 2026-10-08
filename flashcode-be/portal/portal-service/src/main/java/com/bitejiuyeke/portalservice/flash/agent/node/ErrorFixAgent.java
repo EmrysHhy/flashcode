@@ -27,11 +27,9 @@ import java.util.stream.Collectors;
 public class ErrorFixAgent implements NodeAction {
 
     private final ChatClient chatClient;
-    private final String visionModel;
 
-    public ErrorFixAgent(ChatClient chatClient, String visionModel) {
+    public ErrorFixAgent(ChatClient chatClient) {
         this.chatClient = chatClient;
-        this.visionModel = visionModel;
     }
 
     @Override
@@ -98,8 +96,7 @@ public class ErrorFixAgent implements NodeAction {
                         .param(FlashcodeConstant.USER_ID, userId)
                         .param(FlashcodeConstant.APP_ID, appId));
         if (image != null) {
-            log.info("带参考图修复，切换视觉模型 {}, stage={}", visionModel, errorType);
-            spec = spec.options(VisionChatSupport.vlOptions(visionModel));
+            log.info("带参考图修复，使用当前对话模型, stage={}", errorType);
         }
         return ChatContentSupport.collect(spec);
     }

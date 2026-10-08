@@ -44,8 +44,6 @@ logging:
     console: '[%thread] %-5level %logger{36} - %msg%n'
 
 flashcode:
-  vision:
-    model: qwen3-vl-plus
   ai:
     context-windows:
       "[qwen3-coder-plus]": 1000000

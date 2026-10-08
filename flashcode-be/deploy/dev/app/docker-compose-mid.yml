@@ -73,7 +73,8 @@ services:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8848/nacos" ]
-      start_period: 30s
+      # 虚拟机上 Nacos 冷启动约 70 秒，宽限期需覆盖启动时间，否则会被误判为 unhealthy
+      start_period: 120s
       interval: 10s
       timeout: 10s
       retries: 10

@@ -1,6 +1,10 @@
 package com.bitejiuyeke.portalservice.flash.service.implement;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
+import com.bitejiuyeke.bitecommondomain.domain.R;
+import com.bitejiuyeke.bitecommondomain.domain.ResultCode;
+import com.bitejiuyeke.bitefileapi.file.domain.vo.FileVO;
+import com.bitejiuyeke.bitefileapi.file.feign.FileFeignClient;
+import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageBatch;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
 import com.bitejiuyeke.portalservice.flash.utils.ChatContentSupport;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,15 +19,28 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +55,9 @@ public class ImageSearchService {
     private static final int QUERY_MAX_LEN = 80;
     private static final int KEYWORD_COUNT = 3;
     private static final int IMAGE_COUNT = 6;
+    private static final int MAX_IMAGE_BYTES = 1024 * 1024;
+    private static final Duration DOWNLOAD_CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration DOWNLOAD_READ_TIMEOUT = Duration.ofSeconds(4);
     private static final String MCP_SERVICE = "image-mcp";
     private static final int CONNECT_TIMEOUT_MS = 2000;
     private static final Pattern URL_IN_TEXT = Pattern.compile("https?://[^\\s\"'<>]+");
@@ -50,41 +70,50 @@ public class ImageSearchService {
     private final ObjectMapper objectMapper;
     private final DiscoveryClient discoveryClient;
     private final ChatClient chatClient;
+    private final FileFeignClient fileFeignClient;
     private final boolean enabled;
     private final String configuredUrl;
+    private final HttpClient imageClient = HttpClient.newBuilder()
+            .connectTimeout(DOWNLOAD_CONNECT_TIMEOUT)
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    private final ExecutorService transferPool = Executors.newVirtualThreadPerTaskExecutor();
 
     public ImageSearchService(ObjectMapper objectMapper,
                               DiscoveryClient discoveryClient,
                               ChatClient chatClient,
+                              FileFeignClient fileFeignClient,
                               @Value("${flashcode.image-search.enabled:true}") boolean enabled,
                               @Value("${flashcode.image-search.url:}") String configuredUrl) {
         this.objectMapper = objectMapper;
         this.discoveryClient = discoveryClient;
         this.chatClient = chatClient;
+        this.fileFeignClient = fileFeignClient;
         this.enabled = enabled;
         this.configuredUrl = configuredUrl == null ? "" : configuredUrl.strip();
     }
 
     /**
-     * 按需求或编辑说明搜配图。
+     * 按需求或编辑说明搜配图，并立刻开始把图片转存到 OSS。
      * 规则：先让模型写 3 条搜图词，再逐条通过 MCP 调 search_images；
-     * 模型没有有效词时退回规则词，只搜一次。连不上或超时返回空列表。
+     * 模型没有有效词时退回规则词，只搜一次。下载和上传与后续写代码并行，
+     * 单张不超过 1MB。连不上、超时或转存失败时，对应 IMG_n 不换回外链。
      */
-    public List<StockImageDTO> searchForRequirement(String requirement) {
-        if (!enabled || requirement == null || requirement.isBlank()) {
-            return List.of();
+    public StockImageBatch searchForRequirement(Long appId, String requirement) {
+        if (!enabled || appId == null || requirement == null || requirement.isBlank()) {
+            return StockImageBatch.empty();
         }
         String baseUrl = resolveMcpUrl();
         if (baseUrl.isEmpty() || !reachable(baseUrl)) {
             log.warn("图片 MCP 不可达，跳过配图。url={}", baseUrl.isEmpty() ? "(空)" : baseUrl);
-            return List.of();
+            return StockImageBatch.empty();
         }
         List<String> queries = keywordsFromModel(requirement);
         if (queries.isEmpty()) {
             String fallback = extractQuery(requirement);
             log.info("模型未给出搜图词，改用规则词: {}", fallback);
             if (fallback.isEmpty()) {
-                return List.of();
+                return StockImageBatch.empty();
             }
             queries = List.of(fallback);
         } else {
@@ -113,10 +142,108 @@ public class ImageSearchService {
         }
         if (hits.isEmpty()) {
             log.warn("搜图无结果, queries={}", queries);
-        } else {
-            log.info("搜图成功(MCP), queries={}, count={}", queries, hits.size());
+            return StockImageBatch.empty();
         }
-        return hits;
+        log.info("搜图成功(MCP), queries={}, count={}", queries, hits.size());
+        return beginTransfer(appId, hits);
+    }
+
+    /**
+     * 搜图结束后立即并行下载并上传 OSS，调用方可以同时让模型写代码。
+     * 规则：不带 Referer；Content-Type 必须是图片；超过 1MB 或 4 秒读不完就放弃。
+     * 提示词里的 url 留空，OSS 地址只在 restore 时写回。
+     */
+    private StockImageBatch beginTransfer(Long appId, List<StockImageDTO> hits) {
+        List<StockImageDTO> hints = new ArrayList<>();
+        List<CompletableFuture<String>> tasks = new ArrayList<>();
+        for (StockImageDTO hit : hits) {
+            hints.add(new StockImageDTO("", hit.alt()));
+            String remoteUrl = hit.url();
+            tasks.add(CompletableFuture.supplyAsync(() -> transferOne(appId, remoteUrl), transferPool));
+        }
+        log.info("配图开始转存 OSS, appId={}, count={}", appId, hints.size());
+        return new StockImageBatch(hints, tasks);
+    }
+
+    private String transferOne(Long appId, String remoteUrl) {
+        try {
+            Downloaded image = downloadImage(remoteUrl);
+            if (image == null) {
+                return null;
+            }
+            R<FileVO> uploaded = fileFeignClient.uploadStockImage(
+                    new ByteArrayMultipartFile("file", "stock." + image.ext(), image.contentType(), image.bytes()),
+                    appId);
+            if (uploaded == null || uploaded.getCode() != ResultCode.SUCCESS.getCode()
+                    || uploaded.getData() == null || uploaded.getData().getUrl() == null
+                    || uploaded.getData().getUrl().isBlank()) {
+                log.warn("配图上传 OSS 失败, appId={}", appId);
+                return null;
+            }
+            return uploaded.getData().getUrl();
+        } catch (Exception e) {
+            log.warn("配图转存失败, appId={}: {}", appId, e.getMessage());
+            return null;
+        }
+    }
+
+    private Downloaded downloadImage(String url) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(DOWNLOAD_READ_TIMEOUT)
+                    .header("Accept", "image/*")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .GET()
+                    .build();
+            HttpResponse<InputStream> response = imageClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() != 200) {
+                log.warn("配图下载失败, status={}, url={}", response.statusCode(), url);
+                response.body().close();
+                return null;
+            }
+            long announced = response.headers().firstValueAsLong("content-length").orElse(-1);
+            if (announced > MAX_IMAGE_BYTES) {
+                log.warn("配图超过 1MB, 放弃, url={}", url);
+                response.body().close();
+                return null;
+            }
+            String contentType = response.headers().firstValue("content-type").orElse("");
+            String ext = imageExtension(contentType);
+            if (ext == null) {
+                log.warn("配图类型不是图片, type={}, url={}", contentType, url);
+                response.body().close();
+                return null;
+            }
+            try (InputStream in = response.body()) {
+                byte[] bytes = in.readNBytes(MAX_IMAGE_BYTES + 1);
+                if (bytes.length == 0 || bytes.length > MAX_IMAGE_BYTES) {
+                    log.warn("配图为空或超过 1MB, url={}", url);
+                    return null;
+                }
+                return new Downloaded(bytes, contentType.split(";", 2)[0].strip(), ext);
+            }
+        } catch (Exception e) {
+            log.warn("配图下载失败, url={}: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    private static String imageExtension(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        String type = contentType.toLowerCase(Locale.ROOT).split(";", 2)[0].strip();
+        return switch (type) {
+            case "image/jpeg", "image/jpg" -> "jpg";
+            case "image/png" -> "png";
+            case "image/gif" -> "gif";
+            case "image/webp" -> "webp";
+            case "image/bmp" -> "bmp";
+            default -> null;
+        };
+    }
+
+    private record Downloaded(byte[] bytes, String contentType, String ext) {
     }
 
     /**
@@ -126,12 +253,6 @@ public class ImageSearchService {
     private List<String> keywordsFromModel(String requirement) {
         try {
             String text = ChatContentSupport.collect(chatClient.prompt()
-                    .options(DashScopeChatOptions.builder()
-                            .multiModel(false)
-                            .incrementalOutput(true)
-                            .enableThinking(true)
-                            .topP(0.7)
-                            .build())
                     .system("""
                             你只负责写图片搜索词。
                             根据用户内容输出 3 行中文搜图词，每行一个具体画面。
@@ -331,7 +452,8 @@ public class ImageSearchService {
     }
 
     /**
-     * 模型写完后，把 IMG_1 换回真实图片地址。
+     * 模型写完后，把 IMG_1 换成列表里的地址。
+     * 配图转存请用 StockImageBatch.restore，失败的记号会被删掉，不会退回外链。
      */
     public static String restoreImageUrls(String content, List<StockImageDTO> images) {
         if (content == null || images == null || images.isEmpty()) {
@@ -415,6 +537,61 @@ public class ImageSearchService {
         } catch (Exception e) {
             log.warn("解析搜图结果失败: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    private static final class ByteArrayMultipartFile implements MultipartFile {
+
+        private final String name;
+        private final String originalFilename;
+        private final String contentType;
+        private final byte[] content;
+
+        private ByteArrayMultipartFile(String name, String originalFilename, String contentType, byte[] content) {
+            this.name = name;
+            this.originalFilename = originalFilename;
+            this.contentType = contentType;
+            this.content = content;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return originalFilename;
+        }
+
+        @Override
+        public String getContentType() {
+            return contentType;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return content.length == 0;
+        }
+
+        @Override
+        public long getSize() {
+            return content.length;
+        }
+
+        @Override
+        public byte[] getBytes() {
+            return content;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            return new ByteArrayInputStream(content);
+        }
+
+        @Override
+        public void transferTo(File dest) throws IOException {
+            Files.write(dest.toPath(), content);
         }
     }
 }

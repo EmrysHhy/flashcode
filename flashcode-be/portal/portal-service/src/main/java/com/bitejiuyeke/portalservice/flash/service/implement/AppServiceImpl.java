@@ -7,7 +7,7 @@ import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.portalservice.flash.domain.dto.require.AppEditParam;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.AppDetailDTO;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.GenerateAppDTO;
-import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
+import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageBatch;
 import com.bitejiuyeke.portalservice.flash.domain.entity.AppDO;
 import com.bitejiuyeke.portalservice.flash.domain.entity.ChatHistoryDO;
 import com.bitejiuyeke.portalservice.flash.enums.AppTypesEnum;
@@ -212,7 +212,7 @@ public class AppServiceImpl implements IAppService {
             giteeService.pull(appId);
         }
         Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
-        List<StockImageDTO> stockImages = imageSearchService.searchForRequirement(appEditParam.getNewContent());
+        StockImageBatch stockImages = imageSearchService.searchForRequirement(appId, appEditParam.getNewContent());
         List<String> keptUrls = new ArrayList<>();
         String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(),
                 appEditParam.getNewContent(), stockImages, keptUrls);
@@ -222,7 +222,7 @@ public class AppServiceImpl implements IAppService {
         // 不写入会话记忆。用户提示词里带了全部源码，chat_history.content 装不下，下一轮也会把源码再喂给模型
         LoginUserDTO loginUser = tokenService.getLoginUser();
         Long userId = loginUser == null ? null : loginUser.getUserId();
-        String appCode = ImageSearchService.unmaskUrls(ImageSearchService.restoreImageUrls(
+        String appCode = ImageSearchService.unmaskUrls(stockImages.restore(
                 ChatContentSupport.collect(chatClient.prompt()
                 .system(editAppSysPrompt)
                 .user(editAppUserPrompt)
@@ -230,7 +230,7 @@ public class AppServiceImpl implements IAppService {
                         .param(FlashcodeConstant.APP_ID, appId))
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
-                        .build())), stockImages), keptUrls);
+                        .build()))), keptUrls);
         log.info("修改应用代码完成，appId: {}", appId);
 
         Map<String, String> editedFiles = AnalysisUtil.getFiles(appCode);
@@ -558,11 +558,11 @@ public class AppServiceImpl implements IAppService {
 
     /**
      * 编辑用户提示词。
-     * 规则：写明 CSS 选择器和修改要求；有配图时列出【可用图片】，换图只能用这些 url；
+     * 规则：写明 CSS 选择器和修改要求；有配图时只列出 IMG_n，换图只能用这些记号；
      * 后面附全部源码，模型只对目标元素做最小修改。
      */
     private String getEditAppUserPrompt(Map<String, String> codes, String elementSelector, String newContent,
-                                        List<StockImageDTO> stockImages, List<String> keptUrls) {
+                                        StockImageBatch stockImages, List<String> keptUrls) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("【精确修改请求】\n\n");
         prompt.append("目标 CSS 选择器（已精确定位，无需分析）：\n");
@@ -573,7 +573,7 @@ public class AppServiceImpl implements IAppService {
             prompt.append("⚠ 注意：该选择器包含 nth-child，表示这是列表中的一个单独元素。\n");
             prompt.append("你必须确保其他列表项在任何方面都不发生变化。\n");
         }
-        prompt.append(ImageSearchService.imageHint(stockImages));
+        prompt.append(ImageSearchService.imageHint(stockImages == null ? null : stockImages.hints()));
         prompt.append("以下是完整代码文件，请只对目标元素进行最小必要修改：\n\n");
         if (codes != null) {
             for (Map.Entry<String, String> entry : codes.entrySet()) {

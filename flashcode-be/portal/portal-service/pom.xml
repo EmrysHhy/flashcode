@@ -218,6 +218,8 @@
                             <build>
                                 <!--指定Dockerfile的路径-->
                                 <dockerFileDir>${project.basedir}</dockerFileDir>
+                                <!--构建时走虚拟机本机网络，避免桥接网络解析不了镜像源（curl 退出码 6）-->
+                                <network>host</network>
                             </build>
                             <run>
                                 <volumes>

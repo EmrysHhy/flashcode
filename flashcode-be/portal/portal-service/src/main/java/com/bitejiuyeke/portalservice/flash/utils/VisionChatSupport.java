@@ -1,6 +1,5 @@
 package com.bitejiuyeke.portalservice.flash.utils;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -49,23 +48,6 @@ public final class VisionChatSupport {
             return null;
         }
         return path;
-    }
-
-    /**
-     * 构造本次请求覆盖用的 VL 选项：换视觉模型、打开多模态。
-     * incrementalOutput 必须为 true，否则 qwen3-vl 会拒绝非流式调用。
-     *
-     * @param visionModel Nacos / 配置里的视觉模型名，如 qwen3-vl-plus
-     * @return 仅作用于当前 ChatClient 调用的 DashScope 选项
-     */
-    public static DashScopeChatOptions vlOptions(String visionModel) {
-        return DashScopeChatOptions.builder()
-                .model(visionModel)
-                .multiModel(true)
-                .topP(0.7)
-                .enableThinking(true)
-                .incrementalOutput(true)
-                .build();
     }
 
     /**

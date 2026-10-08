@@ -1,11 +1,10 @@
 package com.bitejiuyeke.portalservice.flash.agent.node;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
-import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageDTO;
+import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageBatch;
 import com.bitejiuyeke.portalservice.flash.enums.AppTypesEnum;
 import com.bitejiuyeke.portalservice.flash.mapper.AppMapper;
 import com.bitejiuyeke.portalservice.flash.service.implement.ImageSearchService;
@@ -22,7 +21,6 @@ import org.springframework.ai.vectorstore.VectorStore;
 
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,18 +33,15 @@ public class AppGenerationAgent implements NodeAction {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AppMapper appMapper;
-    private final String visionModel;
     private final ImageSearchService imageSearchService;
 
     public AppGenerationAgent(ChatClient chatClient,
                               AppMapper appMapper,
                               VectorStore vectorStore,
-                              String visionModel,
                               ImageSearchService imageSearchService) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.appMapper = appMapper;
-        this.visionModel = visionModel;
         this.imageSearchService = imageSearchService;
     }
 
@@ -66,8 +61,8 @@ public class AppGenerationAgent implements NodeAction {
             }
             Path image = VisionChatSupport.resolveImage(
                     state.value(FlashcodeConstant.REFERENCE_PATH, String.class).orElse(null));
-            List<StockImageDTO> stockImages = imageSearchService.searchForRequirement(requirement);
-            log.info("搜图结果 appId={}, count={}", appId, stockImages == null ? 0 : stockImages.size());
+            StockImageBatch stockImages = imageSearchService.searchForRequirement(appId, requirement);
+            log.info("搜图结果 appId={}, count={}", appId, stockImages.hints().size());
             String appCode = generateCode(appId,
                     state.value(FlashcodeConstant.USER_ID, Long.class).orElse(null),
                     requirement, image, stockImages);
@@ -109,7 +104,7 @@ public class AppGenerationAgent implements NodeAction {
      * 有参考图时切视觉模型；输出必须能被 AnalysisUtil 解析。
      */
     private String generateCode(Long appId, Long userId, String requirement, Path image,
-                               List<StockImageDTO> stockImages) {
+                               StockImageBatch stockImages) {
         boolean hasStock = stockImages != null && !stockImages.isEmpty();
         var spec = chatClient.prompt()
                 .system(getSysPrompt(appId, hasStock))
@@ -124,26 +119,17 @@ public class AppGenerationAgent implements NodeAction {
                         .searchRequest(SearchRequest.builder().build())
                         .build());
         if (image != null) {
-            log.info("带参考图生成，切换视觉模型 {}, appId={}", visionModel, appId);
-            spec = spec.options(VisionChatSupport.vlOptions(visionModel));
-        } else {
-            // 配图地址只写进页面。打开多模态时通义会去下载这些地址，国内图床经常返回 url error。
-            spec = spec.options(DashScopeChatOptions.builder()
-                    .multiModel(false)
-                    .incrementalOutput(true)
-                    .enableThinking(true)
-                    .topP(0.7)
-                    .build());
+            log.info("带参考图生成，使用当前对话模型, appId={}", appId);
         }
-        return ImageSearchService.restoreImageUrls(ChatContentSupport.collect(spec), stockImages);
+        return stockImages.restore(ChatContentSupport.collect(spec));
     }
 
     /**
      * 用户提示词。
      * 规则：正文是需求文档；有用户上传参考图时附加【参考图】说明；
-     * 有搜到的配图时只给 IMG_1 记号，模型写完后再换回网址。
+     * 有搜到的配图时只给 IMG_1 记号，模型写完后再换成 OSS 地址。
      */
-    private String getUserPrompt(String requirement, boolean hasImage, List<StockImageDTO> stockImages) {
+    private String getUserPrompt(String requirement, boolean hasImage, StockImageBatch stockImages) {
         String prompt = String.join("\n",
                 "【用户需求文档】 ",
                 ImageSearchService.hideUrls(requirement),
@@ -152,13 +138,13 @@ public class AppGenerationAgent implements NodeAction {
         if (hasImage) {
             prompt += "\n【参考图】请根据用户上传的参考图还原布局、配色与主要模块；与需求文档冲突时以需求文档为准。\n";
         }
-        prompt += ImageSearchService.imageHint(stockImages);
+        prompt += ImageSearchService.imageHint(stockImages == null ? null : stockImages.hints());
         return prompt;
     }
     /**
      * 系统提示词。
      * 规则：只能选 Html / Vue3 / Spring_Vue3；禁止复杂鉴权和外部存储；
-     * 有配图必须用「可用图片」URL，没有则用色块/SVG，禁止编造地址；
+     * 有配图必须用「可用图片」里的 IMG_n，没有则用色块/SVG，禁止编造地址；
      * 输出第一行是类型，随后每个文件 FILE: 相对路径 + 完整代码块，禁止省略。
      */
     private String getSysPrompt(Long appId, boolean hasStockImages) {

@@ -91,7 +91,6 @@ public class MultiAgentWorkFlow {
     private final StateGraph stateGraph;
     private final CompiledGraph compiledGraph;
     private final Integer deleteCodeExpire;
-    private final String visionModel;
     private final String nginxPre;
     private final ScheduledExecutorService scheduledExecutorService;
     private final MeterRegistry meterRegistry;
@@ -114,7 +113,6 @@ public class MultiAgentWorkFlow {
                               FileFeignClient fileFeignClient,
                               DockerClient dockerClient,
                               Integer deleteCodeExpire,
-                              String visionModel,
                               String nginxPre,
                               ScheduledExecutorService scheduledExecutorService,
                               MeterRegistry meterRegistry,
@@ -127,7 +125,6 @@ public class MultiAgentWorkFlow {
         this.fileFeignClient = fileFeignClient;
         this.dockerClient = dockerClient;
         this.deleteCodeExpire = deleteCodeExpire;
-        this.visionModel = visionModel;
         this.nginxPre = nginxPre;
         this.scheduledExecutorService = scheduledExecutorService;
         this.meterRegistry = meterRegistry;
@@ -376,11 +373,11 @@ public class MultiAgentWorkFlow {
     private void addNode() {
         try {
             stateGraph.addNode(ID_APP_GENERATION_AGENT,
-                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, visionModel, imageSearchService)));
+                    AsyncNodeAction.node_async(new AppGenerationAgent(chatClient, appMapper, vectorStore, imageSearchService)));
             stateGraph.addNode(ID_BUILD_PREVIEW_NODE,
                     AsyncNodeAction.node_async(new BuildPreviewNode(dockerClient, appMapper, nginxPre)));
             stateGraph.addNode(ID_ERROR_FIX_AGENT,
-                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient, visionModel)));
+                    AsyncNodeAction.node_async(new ErrorFixAgent(chatClient)));
             stateGraph.addNode(ID_APP_SCREENSHOT_NODE,
                     AsyncNodeAction.node_async(new AppScreenshotNode(appMapper, fileFeignClient)));
             stateGraph.addNode(ID_COMMIT_NODE,

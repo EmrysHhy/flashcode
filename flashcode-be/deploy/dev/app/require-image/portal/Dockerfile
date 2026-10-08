@@ -41,6 +41,18 @@ RUN apt-get update && \
     ln -sf /usr/bin/google-chrome-stable /usr/bin/google-chrome && \
     rm -rf /var/lib/apt/lists/*
 
+# ---------- 1.5 匹配版 chromedriver（给 Selenium 截图，构建机需外网） ----------
+RUN CHROME_MAJOR=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | cut -d. -f1) && \
+    DRIVER_VER=$(curl -fsSL "https://registry.npmmirror.com/-/binary/chrome-for-testing/" \
+      | grep -oE "${CHROME_MAJOR}\.[0-9]+\.[0-9]+\.[0-9]+" | sort -uV | tail -n1) && \
+    test -n "$DRIVER_VER" && \
+    curl -fL "https://cdn.npmmirror.com/binaries/chrome-for-testing/${DRIVER_VER}/linux64/chromedriver-linux64.zip" \
+      -o /tmp/chromedriver.zip && \
+    cd /tmp && jar xf chromedriver.zip && \
+    mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+    chmod +x /usr/local/bin/chromedriver && \
+    rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
+
 # ---------- 2. 安装 Maven (稳定缓存层) ----------
 # 清华源只保留当前发行版；旧版本会 404（wget exit 8）。按镜像依次回退。
 RUN MAVEN_TGZ=apache-maven-${MAVEN_VERSION}-bin.tar.gz && \

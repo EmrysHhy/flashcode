@@ -30,8 +30,6 @@ public class MultiAgentConfig {
     @Value("${flashcode.delete-code-expire:12}")
     private Integer deleteCodeExpire;
 
-    @Value("${flashcode.vision.model:qwen3-vl-plus}")
-    private String visionModel;
     @Value("${flashcode.preview.nginx_pre:http://192.168.56.107:80/preview/}")
     private String nginxPre;
 
@@ -57,7 +55,6 @@ public class MultiAgentConfig {
                 fileFeignClient,
                 dockerClient,
                 deleteCodeExpire,
-                visionModel,
                 nginxPre,
                 scheduledExecutorService,
                 meterRegistry,
