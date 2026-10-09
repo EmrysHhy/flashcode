@@ -2,6 +2,7 @@ package com.bitejiuyeke.portalservice.flash.agent.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.bitejiuyeke.bitecommoncore.utils.TimestampUtil;
 import com.bitejiuyeke.bitecommondomain.exception.ServiceException;
 import com.bitejiuyeke.portalservice.flash.constants.FlashcodeConstant;
 import com.bitejiuyeke.portalservice.flash.domain.dto.result.StockImageBatch;
@@ -105,6 +106,7 @@ public class AppGenerationAgent implements NodeAction {
      */
     private String generateCode(Long appId, Long userId, String requirement, Path image,
                                StockImageBatch stockImages) {
+        long beginSeconds = TimestampUtil.getCurrentSeconds();
         boolean hasStock = stockImages != null && !stockImages.isEmpty();
         var spec = chatClient.prompt()
                 .system(getSysPrompt(appId, hasStock))
@@ -121,6 +123,9 @@ public class AppGenerationAgent implements NodeAction {
         if (image != null) {
             log.info("带参考图生成，使用当前对话模型, appId={}", appId);
         }
+        long endSeconds = TimestampUtil.getCurrentSeconds();
+        long differenceSeconds = TimestampUtil.calculateDifferenceSeconds(beginSeconds, endSeconds);
+        log.info("生成应用代码耗时: {} 秒", differenceSeconds);
         return stockImages.restore(ChatContentSupport.collect(spec));
     }
 

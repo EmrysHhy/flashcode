@@ -19,11 +19,11 @@ public class ImageSearchController {
 
     /**
      * HTTP 搜图入口，供 portal 调用。
-     * 规则：query 为关键词，count 1～6；返回 [{url, alt}] JSON 数组。
+     * 规则：query 为关键词，count 1～8；返回 [{url, alt}] JSON 数组。
      */
     @GetMapping("/search_images")
     public String searchImages(@RequestParam String query,
-                               @RequestParam(defaultValue = "6") Integer count) {
+                               @RequestParam(defaultValue = "8") Integer count) {
         return imageSearchTool.searchImages(query, count);
     }
 }

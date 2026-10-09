@@ -53,10 +53,12 @@ public class UserLoginController implements AppUserLoginFeignClient {
      */
     @Override
     public R<TokenVO> login(CodeLoginReqParam codeLoginParam) {
+        log.info("使用验证码登录，phone={}, email={}", codeLoginParam.getPhone(), codeLoginParam.getEmail());
         CodeLoginDTO codeLoginDTO = new CodeLoginDTO();
         codeLoginDTO.setPhone(codeLoginParam.getPhone());
         codeLoginDTO.setEmail(codeLoginParam.getEmail());
         codeLoginDTO.setCode(codeLoginParam.getCode());
+        log.info("已登录");
         return R.ok(userService.login(codeLoginDTO).convertToVo());
     }
 

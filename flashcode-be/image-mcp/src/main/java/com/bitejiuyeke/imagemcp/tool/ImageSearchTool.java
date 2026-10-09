@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 @Component
 public class ImageSearchTool {
 
-    private static final int MAX_COUNT = 6;
+    private static final int MAX_COUNT = 8;
     private static final String EMPTY = "[]";
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -53,7 +53,7 @@ public class ImageSearchTool {
     @Tool(name = "search_images", description = "Search photos by keyword from domestic image sites. Returns a JSON array of {url, alt}.")
     public String searchImages(
             @ToolParam(description = "Search keyword") String query,
-            @ToolParam(description = "Number of photos, 1 to 6") Integer count) {
+            @ToolParam(description = "Number of photos, 1 to 8") Integer count) {
         if (query == null || query.isBlank()) {
             return EMPTY;
         }

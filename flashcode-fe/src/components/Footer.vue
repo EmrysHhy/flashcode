@@ -11,32 +11,15 @@
 
         <div class="nav-section">
           <h4 class="section-title">关于我们</h4>
-          <a href="#" class="link">关于比特</a>
-        </div>
-
-        <div class="contact-section">
-          <h4 class="section-title">联系我们</h4>
-          <a class="contact-row" href="tel:029-88218621">
-            <span class="icon phone-icon"></span>
-            <span class="contact-text">029-88218621</span>
-          </a>
-        </div>
-
-        <div class="qrcode-section">
-          <div class="qrcode-frame">
-            <img :src="qrcodeSrc" alt="联系我们二维码" class="qrcode" />
-          </div>
-          <span class="qrcode-text">联系我们</span>
+          <a href="/about" class="link">项目说明</a>
         </div>
       </div>
 
       <div class="copyright">
         <p>
-          <span>西安比特教育科技有限公司</span>
+          <span>Flashcode</span>
           <span class="sep" aria-hidden="true"></span>
-          <span>Copyright © 2025</span>
-          <span class="sep" aria-hidden="true"></span>
-          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">陕ICP备18006225号</a>
+          <span>Copyright © 2026</span>
         </p>
       </div>
     </div>
@@ -45,7 +28,6 @@
 
 <script setup>
 const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
-const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
 </script>
 
 <style scoped lang="scss">
@@ -66,7 +48,7 @@ const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto;
   align-items: start;
   column-gap: 72px;
   margin-bottom: 40px;
@@ -95,8 +77,7 @@ const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
   color: rgba(255, 255, 255, 0.55);
 }
 
-.nav-section,
-.contact-section {
+.nav-section {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -111,8 +92,7 @@ const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
   color: #ffffff;
 }
 
-.link,
-.contact-row {
+.link {
   font-size: 14px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.62);
@@ -120,52 +100,8 @@ const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
   transition: color 0.2s ease;
 }
 
-.link:hover,
-.contact-row:hover {
+.link:hover {
   color: #ffffff;
-}
-
-.contact-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-}
-
-.phone-icon {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  background: currentColor;
-  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V21a1 1 0 01-1 1C10.07 22 2 13.93 2 3a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.59a1 1 0 01-.25 1.01l-2.2 2.19z"/></svg>') center / contain no-repeat;
-}
-
-.qrcode-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.qrcode-frame {
-  padding: 8px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-
-.qrcode {
-  display: block;
-  width: 88px;
-  height: 88px;
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.qrcode-text {
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.5);
 }
 
 .copyright {
@@ -213,13 +149,8 @@ const qrcodeSrc = new URL('@/imges/wxCode.webp', import.meta.url).href;
     column-gap: 24px;
   }
 
-  .brand-section,
-  .qrcode-section {
+  .brand-section {
     grid-column: 1 / -1;
-  }
-
-  .qrcode-section {
-    align-items: flex-start;
   }
 }
 

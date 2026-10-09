@@ -54,9 +54,9 @@ public class ImageSearchService {
 
     private static final int QUERY_MAX_LEN = 80;
     private static final int KEYWORD_COUNT = 3;
-    private static final int IMAGE_COUNT = 6;
-    /** 每个搜图词最多收 2 张，避免第一句界面词占满全部配图。 */
-    private static final int IMAGES_PER_QUERY = 2;
+    private static final int IMAGE_COUNT = 8;
+    /** 每个搜图词最多收 3 张，三条词加起来不超过 8 张。 */
+    private static final int IMAGES_PER_QUERY = 3;
     private static final int MAX_IMAGE_BYTES = 1024 * 1024;
     private static final Duration DOWNLOAD_CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration DOWNLOAD_READ_TIMEOUT = Duration.ofSeconds(4);

@@ -2,7 +2,7 @@
   <div class="about-page">
     <Header />
     <AboutBanner />
-    <AboutIntro />
+    <AboutArticle />
     <Footer />
   </div>
 </template>
@@ -11,7 +11,7 @@
 import Header from '@/components/Header.vue';
 import Footer from '@/components/Footer.vue';
 import AboutBanner from '@/components/aboutComp/AboutBanner.vue';
-import AboutIntro from '@/components/aboutComp/AboutIntro.vue';
+import AboutArticle from '@/components/aboutComp/AboutArticle.vue';
 </script>
 
 <style scoped lang="scss">
