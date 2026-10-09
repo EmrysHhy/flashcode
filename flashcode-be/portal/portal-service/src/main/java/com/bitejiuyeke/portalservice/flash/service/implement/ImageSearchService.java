@@ -55,9 +55,15 @@ public class ImageSearchService {
     private static final int QUERY_MAX_LEN = 80;
     private static final int KEYWORD_COUNT = 3;
     private static final int IMAGE_COUNT = 6;
+    /** 每个搜图词最多收 2 张，避免第一句界面词占满全部配图。 */
+    private static final int IMAGES_PER_QUERY = 2;
     private static final int MAX_IMAGE_BYTES = 1024 * 1024;
     private static final Duration DOWNLOAD_CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration DOWNLOAD_READ_TIMEOUT = Duration.ofSeconds(4);
+    /** 只写 Mozilla/5.0 时，花瓣会回 567，摄图网会回 403。 */
+    private static final String DOWNLOAD_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
     private static final String MCP_SERVICE = "image-mcp";
     private static final int CONNECT_TIMEOUT_MS = 2000;
     private static final Pattern URL_IN_TEXT = Pattern.compile("https?://[^\\s\"'<>]+");
@@ -125,15 +131,17 @@ public class ImageSearchService {
                 break;
             }
             try {
+                int taken = 0;
                 for (StockImageDTO hit : callMcp(baseUrl, query)) {
-                    if (hits.size() >= IMAGE_COUNT) {
+                    if (hits.size() >= IMAGE_COUNT || taken >= IMAGES_PER_QUERY) {
                         break;
                     }
                     if (!hit.url().startsWith("https://")) {
                         continue;
                     }
                     if (hits.stream().noneMatch(item -> item.url().equals(hit.url()))) {
-                        hits.add(hit);
+                        hits.add(new StockImageDTO(hit.url(), query));
+                        taken++;
                     }
                 }
             } catch (Exception e) {
@@ -150,7 +158,8 @@ public class ImageSearchService {
 
     /**
      * 搜图结束后立即并行下载并上传 OSS，调用方可以同时让模型写代码。
-     * 规则：不带 Referer；Content-Type 必须是图片；超过 1MB 或 4 秒读不完就放弃。
+     * 规则：先不带 Referer 下载；403/567 时再带图床自己的来源重试一次。
+     * Content-Type 必须是图片；超过 1MB 或 4 秒读不完就放弃。
      * 提示词里的 url 留空，OSS 地址只在 restore 时写回。
      */
     private StockImageBatch beginTransfer(Long appId, List<StockImageDTO> hits) {
@@ -188,44 +197,114 @@ public class ImageSearchService {
     }
 
     private Downloaded downloadImage(String url) {
+        Fetch fetched = fetchImage(url, null);
+        if (fetched.image() != null) {
+            return fetched.image();
+        }
+        if (fetched.status() == 401 || fetched.status() == 403 || fetched.status() == 567) {
+            String referer = siteReferer(url);
+            if (referer != null) {
+                fetched = fetchImage(url, referer);
+                if (fetched.image() != null) {
+                    return fetched.image();
+                }
+            }
+        }
+        if (fetched.error() != null) {
+            log.warn("配图下载失败, url={}: {}", url, fetched.error());
+        } else if (fetched.status() > 0) {
+            log.warn("配图下载失败, status={}, url={}", fetched.status(), url);
+        }
+        return null;
+    }
+
+    /**
+     * 图床拒绝空来源时，用来源站自己的地址再请求一次。不用预览页地址，避免 360 防盗链。
+     */
+    private static String siteReferer(String url) {
+        String host;
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+            host = URI.create(url).getHost();
+        } catch (Exception e) {
+            return null;
+        }
+        if (host == null || host.isBlank()) {
+            return null;
+        }
+        String name = host.toLowerCase(Locale.ROOT);
+        if (name.endsWith("huaban.com")) {
+            return "https://huaban.com/";
+        }
+        if (name.endsWith("699pic.com")) {
+            return "https://699pic.com/";
+        }
+        if (name.contains("baidu.com")) {
+            return "https://image.baidu.com/";
+        }
+        if (name.contains("sogou.com")) {
+            return "https://pic.sogou.com/";
+        }
+        if (name.contains("bing.")) {
+            return "https://cn.bing.com/";
+        }
+        if (name.contains("qhimg") || name.endsWith("so.com")) {
+            return "https://image.so.com/";
+        }
+        return "https://" + name + "/";
+    }
+
+    private Fetch fetchImage(String url, String referer) {
+        HttpResponse<InputStream> response = null;
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                     .timeout(DOWNLOAD_READ_TIMEOUT)
-                    .header("Accept", "image/*")
-                    .header("User-Agent", "Mozilla/5.0")
-                    .GET()
-                    .build();
-            HttpResponse<InputStream> response = imageClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            if (response.statusCode() != 200) {
-                log.warn("配图下载失败, status={}, url={}", response.statusCode(), url);
+                    .header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                    .header("User-Agent", DOWNLOAD_USER_AGENT)
+                    .GET();
+            if (referer != null && !referer.isBlank()) {
+                builder.header("Referer", referer);
+            }
+            response = imageClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            int status = response.statusCode();
+            if (status != 200) {
                 response.body().close();
-                return null;
+                return new Fetch(null, status, null);
             }
             long announced = response.headers().firstValueAsLong("content-length").orElse(-1);
             if (announced > MAX_IMAGE_BYTES) {
-                log.warn("配图超过 1MB, 放弃, url={}", url);
                 response.body().close();
-                return null;
+                log.warn("配图超过 1MB, 放弃, url={}", url);
+                return new Fetch(null, status, null);
             }
             String contentType = response.headers().firstValue("content-type").orElse("");
             String ext = imageExtension(contentType);
             if (ext == null) {
-                log.warn("配图类型不是图片, type={}, url={}", contentType, url);
                 response.body().close();
-                return null;
+                log.warn("配图类型不是图片, type={}, url={}", contentType, url);
+                return new Fetch(null, status, null);
             }
             try (InputStream in = response.body()) {
                 byte[] bytes = in.readNBytes(MAX_IMAGE_BYTES + 1);
                 if (bytes.length == 0 || bytes.length > MAX_IMAGE_BYTES) {
                     log.warn("配图为空或超过 1MB, url={}", url);
-                    return null;
+                    return new Fetch(null, status, null);
                 }
-                return new Downloaded(bytes, contentType.split(";", 2)[0].strip(), ext);
+                String type = contentType.split(";", 2)[0].strip();
+                return new Fetch(new Downloaded(bytes, type, ext), status, null);
             }
         } catch (Exception e) {
-            log.warn("配图下载失败, url={}: {}", url, e.getMessage());
-            return null;
+            if (response != null) {
+                try {
+                    response.body().close();
+                } catch (Exception ignored) {
+                    // 失败路径只保留原始异常
+                }
+            }
+            return new Fetch(null, 0, e.getMessage());
         }
+    }
+
+    private record Fetch(Downloaded image, int status, String error) {
     }
 
     private static String imageExtension(String contentType) {
@@ -248,15 +327,18 @@ public class ImageSearchService {
 
     /**
      * 让模型根据需求写出搜图词。
-     * 规则：不写入聊天记录；只收 3 行画面描述，失败返回空列表。
+     * 规则：只写页面要展示的实物、品牌、地点或人物；不写界面、卡片、评分这类页面结构；
+     * 不写入聊天记录；最多 3 条，失败返回空列表。
      */
     private List<String> keywordsFromModel(String requirement) {
         try {
             String text = ChatContentSupport.collect(chatClient.prompt()
                     .system("""
                             你只负责写图片搜索词。
-                            根据用户内容输出 3 行中文搜图词，每行一个具体画面。
-                            不要解释，不要序号，不要代码，不要输出网址。""")
+                            从用户内容里找出页面真正要展示的实物、品牌、地点或人物，每个对象一行。
+                            每行 4 到 12 个字，必须能搜到该对象的照片。例如：公牛墙壁插座、小米智能插座。
+                            不要写界面、系统、网页、截图、卡片、列表、评分、排行、推荐、应用、后台。
+                            不要解释，不要序号，不要代码，不要输出网址。最多 3 行。""")
                     .user(hideUrls(requirement)));
             return parseKeywords(text);
         } catch (Exception e) {
@@ -267,7 +349,7 @@ public class ImageSearchService {
 
     /**
      * 解析模型输出的搜图词。
-     * 规则：去掉序号和空行，跳过代码块，最多 3 条。
+     * 规则：去掉序号和空行，跳过代码块和界面类词，最多 3 条。
      */
     static List<String> parseKeywords(String text) {
         if (text == null || text.isBlank()) {
@@ -279,7 +361,7 @@ public class ImageSearchService {
                     .replaceFirst("^[-*\\d.、]+\\s*", "")
                     .replace("`", "")
                     .strip();
-            if (word.isEmpty() || word.startsWith("FILE:") || word.startsWith("```")) {
+            if (word.isEmpty() || word.startsWith("FILE:") || word.startsWith("```") || isUiKeyword(word)) {
                 continue;
             }
             word = clip(word);
@@ -291,6 +373,15 @@ public class ImageSearchService {
             }
         }
         return words;
+    }
+
+    /**
+     * 界面、评分、卡片这类词搜到的是软件截图，不能当产品配图。
+     */
+    private static boolean isUiKeyword(String word) {
+        return word.contains("界面") || word.contains("截图") || word.contains("网页")
+                || word.contains("卡片") || word.contains("评分") || word.contains("后台")
+                || word.contains("排行") || word.contains("推荐");
     }
 
     /**
@@ -436,17 +527,24 @@ public class ImageSearchService {
     }
 
     /**
-     * 提示词里只放 IMG_1 这种记号，避免新模型把图床地址当成要下载的图片。
+     * 提示词里只放 IMG_n，冒号前是这张图的主体。
+     * 规则：不写网址；主体对不上的条目不能用这张图。
      */
     public static String imageHint(List<StockImageDTO> images) {
         if (images == null || images.isEmpty()) {
             return "";
         }
-        StringBuilder hint = new StringBuilder("\n【可用图片】配图时 img 的 src 只能写成下面的记号，不要写网址：\n");
+        StringBuilder hint = new StringBuilder("""
+
+                【可用图片】
+                每行冒号前是这张照片的主体，冒号后是唯一可用的 src。不要写网址。
+                只把图片用在主体一致的那一项上。主体对不上就不要用，改用色块。
+                禁止把软件界面、网页截图套到产品或品牌上。
+                """);
         for (int i = 0; i < images.size(); i++) {
             StockImageDTO hit = images.get(i);
-            String alt = hit.alt() == null || hit.alt().isBlank() ? "photo" : hit.alt();
-            hint.append("- ").append(alt).append(": IMG_").append(i + 1).append('\n');
+            String subject = hit.alt() == null || hit.alt().isBlank() ? "实物照片" : hit.alt();
+            hint.append("- ").append(subject).append(": IMG_").append(i + 1).append('\n');
         }
         return hint.toString();
     }

@@ -2,7 +2,7 @@ CREATE TABLE `app` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '应用主键ID',
   `user_id` bigint NOT NULL COMMENT '所属用户主键ID',
   `app_name` varchar(10) NOT NULL COMMENT '应用名称',
-  `app_desc` varchar(100) NOT NULL COMMENT '应用描述',
+  `app_desc` varchar(200) NOT NULL COMMENT '应用描述',
   `app_doc` text DEFAULT NULL COMMENT '应用需求文档',
   `app_preview_url` varchar(100) DEFAULT NULL COMMENT '应用预览地址',
   `deploy_status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '部署状态：0=未部署，1=已部署',
