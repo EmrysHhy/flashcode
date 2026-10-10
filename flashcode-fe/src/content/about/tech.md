@@ -1,42 +1,55 @@
-# 技术选型
 
-Flashcode 是一个应用生成门户。用户写出需求后，后端用大模型生成 HTML、Vue 3 或 Spring Boot + Vue 3 工程，再在虚拟机里预览、截图和发布。选型都围绕这条链路，而不是先堆框架。
+# 项目介绍
+**Flashcode** 是一个面向编程小白的一键应用生成项目。可以通过自然语言一键生成自己想要的系统并且可选择发布网址提供给任何人使用。目前支持的编程语言有：**HTML**、**VUE3** 和 **VUE3+Spring**。
+***
+## 大致流程
+   1.  用户登录后发送提示词，模型返回需求文档。
+        ![首页对话](images/home-chat.png)
+        ![需求文档](images/requirement-doc.png)
+   2.  审核或修改大模型返回的需求文档，点击立即生成即可等待系统生成好代码并且能够在本页面中实时预览
+        ![应用预览](images/app-preview.png)
+   3.  用户可通过普通编辑模式通过元素选择器选择元素修改内容
+      ![元素编辑](images/element-edit.png)
+   4. 高级编辑功能提供VsCode页面可以手动修改代码
+        ![代码编辑](images/code-edit.png)
+   5. 点击发布之后就可以公开此应用到大厅中，所有用户都可以点击访问,也可以直接在浏览器通过网址访问
+        ![案例广场](images/case-square.png)
+# 项目组件
 
-## 一个对话模型
+![技术架构](images/tech-architecture.png)
 
-生成、修错、写搜图词都走同一个通义千问对话模型，配置在 Nacos 的 `spring.ai.dashscope.chat.options.model`。
+| 分类 | 技术/组件 | 简介 |
+| --- | --- | --- |
+| AI相关 | Spring AI Alibaba | 接入通义千问。对话、向量和 Graph 工作流共用这一套，模型名配在 Nacos 的 `spring.ai.dashscope.chat.options.model`。 |
+| AI相关 | 会话记忆 | 多轮上下文放在 Redis。生成出的整份源码不写入记忆，下一轮窗口留给需求和修改说明。 |
+| AI相关 | 多模态 | `ChatClientConfig` 按模型名打开 `multiModel`。名字里带 `-vl` 或 `qwen3.8` 时走视觉接口，提示词里只放 `IMG_n` 记号。 |
+| AI相关 | RAG | 生成和改需求时用 `QuestionAnswerAdvisor` 查 Milvus。 |
+| AI相关 | MCP | `image-mcp` 单独提供 `search_images`。门户决定搜什么、用哪几张，图源失败不打断代码生成。 |
+| AI相关 | Multi-Agent | `StateGraph` 串起生成、构建预览、修错、截图和提交。生成、截图、提交在一次流程里各最多执行 2 次。 |
+| AI相关 | Milvus | 向量库，旁边跑 etcd 和 MinIO。向量由通义 embedding 写入，供 RAG 做相似度检索。 |
+| 后端 | Spring Boot | 3.3.3，运行在 Java 21。门户、网关、文件服务、搜图服务各自打成一个可执行包。 |
+| 后端 | Spring Cloud | Gateway 做统一入口，OpenFeign 调文件服务，LoadBalancer 按 Nacos 上的实例转发。 |
+| 后端 | Redis | 存对话记忆和登录验证码。生成代码时的整份源码不写入记忆。 |
+| 后端 | Nacos | 注册中心和配置中心，独立模式，配置数据在 MySQL。模型名、图搜开关、Gitee 令牌改配置即可，不用重新打包。 |
+| 后端 | MySQL | 存用户、应用、需求文档和聊天记录。应用描述是 `varchar(100)` 短摘要，完整文档在 `app_doc`。 |
+| 后端 | MyBatis-Plus | 门户的持久层，映射用户和应用相关表。 |
+| 后端 | JWT | 登录后签发访问令牌，网关和门户用同一套校验。 |
+| 后端 | Nginx | 预览容器托管用户应用的静态资源；`/{appId}/api` 的 location 由脚本按 appId 动态生成并热重载，反向代理到对应 jar 的端口。发布目录和预览 dist 分开拷贝，广场打开已发布应用时走发布目录。 |
+| 后端 | 阿里云 OSS | 存截图和配图，以及用户头像。公开读。|
+| 后端 | Selenium | 容器里的 Chrome 打开预览地址，截首页图。ChromeDriver 在构建镜像时放进容器。 |
+| 运维 | Docker | 中间件和应用都跑在容器里。门户通过 docker-java 在容器中执行用户工程的 `npm run build`，并按 appId 分配端口、在预览容器内启动后端 jar。 |
+| 运维 | Docker Compose | 一次拉起 MySQL、Nacos、Redis、Milvus、预览 Nginx，以及 Prometheus、Grafana。 |
+| 运维 | Prometheus | 每 15 秒抓取门户 Actuator 的 `/portal/actuator/prometheus`。生成耗时、token 用量和上下文占用率都从这里进时序库。 |
+| 运维 | Grafana | 读 Prometheus 的数据做监控面板。管理端口映射在 3001。 |
+| 三方对接 | Gitee | 用户应用的文本源码推到 `flash-user-code/{appId}/`。本地目录删掉后可以再拉回来。图片是二进制，不进这个仓库。 |
+| 三方对接 | 阿里云短信 / 邮件 | 登录验证码。手机号走短信，邮箱走邮件，验证码和当日发送次数缓存在 Redis。 |
+| 前端 | Vue 3 | 门户框架，Vite 构建。生成出的用户应用也以 Vue 3 为主，预览和广场沿用同一套组件模型。 |
+| 前端 | Element Plus | 登录、列表和表单。 |
 
-选一个模型，是因为带参考图时再换视觉模型会把路由拆成两套。qwen3.8 这类模型本身能看图，分开切换反而要维护两份参数。`ChatClientConfig` 只根据模型名决定 `multiModel`：名字里带 `-vl` 或 `qwen3.8` 等时走多模态接口，否则走文本接口。这个开关如果配错，通义会返回 `url error`。
+[Github](https://github.com/EmrysHhy/flashcode)
 
-提示词里不放图片网址。搜图结果用 `IMG_1` 这种记号，模型写完后再换回地址。通义看到正文里的 `https` 会自己去下载，远程图床经常失败。
 
-## Spring Cloud 与 Nacos
 
-门户、文件服务、网关、搜图服务拆成独立容器，用 Nacos 做注册和配置。模型名、图搜开关、Gitee 令牌都放在 Nacos，改配置不用重新打包。
 
-Nacos 用独立模式，数据在 MySQL。健康检查只看 8848 端口是否起来。配置长轮询走 9848 的 gRPC，这条链路还会查库做鉴权，所以端口健康不代表配置监听一定成功。
 
-## MCP 搜图
 
-配图不在门户里直接抓网页。`image-mcp` 单独提供 `search_images`，门户用 MCP 客户端调用。图源按国内网络能访问的顺序：360、必应中国、百度、搜狗。
-
-搜图词由模型先写，每条只描述页面要展示的实物、品牌、地点或人物。界面、卡片、评分这类词会搜到软件截图，所以提示词里明确禁止，解析时也会丢掉。每个词最多取 3 张，总数不超过 8 张，避免第一句搜图词占满全部配图。
-
-## 数据各自解决一类问题
-
-- **MySQL** 存用户、应用、需求文档和聊天记录。应用描述字段是 `varchar(100)`，只存短摘要，完整文档在 `app_doc`。
-- **Redis** 做对话记忆。生成代码时的整份源码不写入记忆，否则下一轮上下文会被源码占满。
-- **Milvus** 存向量，用通义 embedding。启动时如果连不上向量服务，初始化失败不能拖垮门户。
-- **OSS** 存截图和配图。配图对象键是 `project/flashcode/app/{appId}/{uuid}.ext`，公开读。Gitee 只推文本源码，图片是二进制，Contents API 按 UTF-8 再 Base64 会损坏。
-
-## 前端门户
-
-门户用 Vue 3、Vue Router、Pinia 和 Element Plus。选 Vue 3 是因为生成出的用户应用也以 Vue 3 为主，同一套组件模型方便看预览和广场。Element Plus 负责登录、列表和表单，不自己造一套控件。
-
-Markdown 渲染用已经依赖的 `marked`。对话里的模型输出和本页说明都走它，不再引入第二套解析器。
-
-## 预览和发布
-
-生成结果写到 `user-code/{appId}`。HTML 直接拷到预览目录，Vue 工程在容器里 `npm run build`。发布目录和预览 dist 分开拷贝，避免广场打开已发布应用时 404。
-
-首页截图用容器里的 Chrome 打开预览地址。驱动在构建镜像时准备好，运行时再去外网下载会受虚拟机 DNS 影响。

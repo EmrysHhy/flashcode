@@ -221,6 +221,40 @@ public class FileWriterUtil {
     }
 
     /**
+     * 把预览目录里的 jar 复制到发布目录，供发布容器启动后端。
+     * 纯前端应用没有 jar，返回 empty。
+     */
+    public static java.util.Optional<Path> copyPreviewJarToDeploy(Long appId, Path deployDir) {
+        if (appId == null || deployDir == null) {
+            throw new ServiceException("发布目录不能为空");
+        }
+        Path previewDir = Paths.get(FlashcodeConstant.USER_PREVIEW_DIR, String.valueOf(appId))
+                .toAbsolutePath()
+                .normalize();
+        if (!Files.isDirectory(previewDir)) {
+            return java.util.Optional.empty();
+        }
+        Path jarFile;
+        try {
+            jarFile = findSingleJar(previewDir);
+        } catch (ServiceException e) {
+            return java.util.Optional.empty();
+        } catch (IOException e) {
+            throw new ServiceException("复制发布 jar 失败");
+        }
+        Path target = deployDir.toAbsolutePath().normalize().resolve(jarFile.getFileName());
+        try {
+            Files.createDirectories(target.getParent());
+            Files.copy(jarFile, target, StandardCopyOption.REPLACE_EXISTING);
+            log.info("jar 已复制到发布目录, src={}, dest={}", jarFile, target);
+            return java.util.Optional.of(target);
+        } catch (IOException e) {
+            log.error("复制 jar 到发布目录失败, appId={}", appId, e);
+            throw new ServiceException("复制发布 jar 失败");
+        }
+    }
+
+    /**
      * 把 source 目录里的内容拷到 target。
      * user-code 和 user-preview 往往不在同一块盘/挂载上，Files.move 会失败，所以按文件树复制。
      */

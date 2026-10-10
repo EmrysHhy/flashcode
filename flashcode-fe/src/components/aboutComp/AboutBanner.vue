@@ -1,7 +1,7 @@
 <template>
   <section class="about-banner">
     <div class="banner-bg" :style="{ backgroundImage: `url(${bannerBg})` }">
-      <h1 class="banner-title">Flashcode项目说明</h1>
+      <h1 class="banner-title">Flashcode</h1>
     </div>
   </section>
 </template>

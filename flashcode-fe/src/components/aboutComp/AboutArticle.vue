@@ -22,18 +22,30 @@ import { computed, ref } from 'vue';
 import { marked } from 'marked';
 import tech from '@/content/about/tech.md?raw';
 import problems from '@/content/about/problems.md?raw';
-import gains from '@/content/about/gains.md?raw';
+
+const imageModules = import.meta.glob('@/content/about/images/*.{png,jpg,jpeg,webp,gif}', {
+  eager: true,
+  import: 'default',
+});
 
 const docs = [
   { id: 'tech', title: '技术选型', source: tech },
   { id: 'problems', title: '难点与解法', source: problems },
-  { id: 'gains', title: '优势与收获', source: gains },
 ];
 
 const currentId = ref(docs[0].id);
+
+function resolveImages(html) {
+  return html.replace(/src="([^"]+)"/g, (match, src) => {
+    const name = src.split('/').pop();
+    const entry = Object.entries(imageModules).find(([path]) => path.endsWith(`/${name}`));
+    return entry ? `src="${entry[1]}"` : match;
+  });
+}
+
 const html = computed(() => {
   const current = docs.find((item) => item.id === currentId.value) || docs[0];
-  return marked.parse(current.source);
+  return resolveImages(marked.parse(current.source));
 });
 </script>
 
@@ -111,6 +123,18 @@ const html = computed(() => {
   background: #f3f4f6;
   padding: 0 4px;
   border-radius: 4px;
+}
+
+.doc :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border-radius: 8px;
+}
+
+.doc :deep(a) {
+  color: #1d4ed8;
 }
 
 @media (max-width: 800px) {

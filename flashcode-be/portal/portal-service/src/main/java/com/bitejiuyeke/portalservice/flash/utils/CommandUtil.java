@@ -127,6 +127,32 @@ public class CommandUtil {
     }
 
     /**
+     * 在该应用自己的发布容器里启动 jar。容器内固定 8080，由发布 nginx 把 /{appId}/api 转过来。
+     */
+    public static void runDeployJar(DockerClient dockerClient, String containerName, Long appId, String jarName) {
+        if (dockerClient == null) {
+            throw new ServiceException("DockerClient 未初始化");
+        }
+        if (containerName == null || containerName.isBlank() || jarName == null || jarName.isBlank()) {
+            throw new ServiceException("发布容器或 jar 不能为空");
+        }
+        String jarInContainer = "/workspace/user-deploy/" + appId + "/" + jarName;
+        String pidFile = "/tmp/flashcode-deploy-" + appId + ".pid";
+        String logFile = "/workspace/user-deploy/" + appId + "/app.log";
+        String startScript = String.join(" ",
+                "kill $(cat " + pidFile + ") 2>/dev/null || true;",
+                "nohup java -jar " + jarInContainer,
+                "--server.port=8080",
+                ">" + logFile, "2>&1", "</dev/null &",
+                "echo $! > " + pidFile
+        );
+        ensureContainerRunning(dockerClient, containerName);
+        execInContainer(dockerClient, containerName, "启动发布 jar", "bash", "-c", startScript);
+        execInContainer(dockerClient, containerName, "重载发布 nginx", "nginx", "-s", "reload");
+        log.info("发布 jar 已启动, appId={}, container={}, jar={}", appId, containerName, jarInContainer);
+    }
+
+    /**
      * 按 appId 算出固定端口，范围 8001-9999。
      * 预览时这是共享容器里的进程端口；发布时这是宿主机映射端口。
      * 同一个 appId 结果不变，不同应用不会都占用 8080。

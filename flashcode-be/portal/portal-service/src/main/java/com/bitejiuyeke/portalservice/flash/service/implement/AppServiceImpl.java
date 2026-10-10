@@ -212,7 +212,11 @@ public class AppServiceImpl implements IAppService {
             giteeService.pull(appId);
         }
         Map<String,String> codes = FileWriterUtil.readSourceFiles(appDir);
-        StockImageBatch stockImages = imageSearchService.searchForRequirement(appId, appEditParam.getNewContent());
+        String searchText = app.getAppDoc() == null ? "" : app.getAppDoc();
+        if (appEditParam.getNewContent() != null && !appEditParam.getNewContent().isBlank()) {
+            searchText = searchText + "\n" + appEditParam.getNewContent();
+        }
+        StockImageBatch stockImages = imageSearchService.searchForRequirement(appId, searchText);
         List<String> keptUrls = new ArrayList<>();
         String editAppUserPrompt = getEditAppUserPrompt(codes, appEditParam.getElementSelector(),
                 appEditParam.getNewContent(), stockImages, keptUrls);
@@ -348,6 +352,7 @@ public class AppServiceImpl implements IAppService {
         if (Integer.valueOf(DeployStatusEnum.DEPLOYED.getValue()).equals(app.getDeployStatus())) {
             log.info("应用已经部署完毕,直接返回URL");
             FileWriterUtil.copyPreviewDistToDeploy(appId, deployAppDir(appId));
+            startDeployBackend(appId);
             return app.getAppUrl();
         }
         Path appDir = Paths.get(FlashcodeConstant.USER_CODE_DIR, String.valueOf(appId))
@@ -374,8 +379,22 @@ public class AppServiceImpl implements IAppService {
         // 2.html,dist,jar包保存到 /workspace/user-preview 会映射到宿主机 /deploy/dev/data/flashcodedata/flashcode-app/user-preview
         packageCode(appType, codePath, appId);
         FileWriterUtil.copyPreviewDistToDeploy(appId, deployAppDir(appId));
+        startDeployBackend(appId);
         log.info("发布成功,请访问url:{}",url);
         return url;
+    }
+
+    /**
+     * Spring 应用的列表和图片在后端接口里。发布容器只挂了前端 dist 时，页面标题还在，列表是空的。
+     */
+    private void startDeployBackend(Long appId) {
+        java.util.Optional<Path> jar = FileWriterUtil.copyPreviewJarToDeploy(appId, deployAppDir(appId));
+        if (jar.isEmpty()) {
+            log.info("没有后端 jar，跳过发布进程, appId={}", appId);
+            return;
+        }
+        String containerName = deployContainerName + "-" + appId;
+        CommandUtil.runDeployJar(dockerClient, containerName, appId, jar.get().getFileName().toString());
     }
 
     /**
@@ -567,7 +586,9 @@ public class AppServiceImpl implements IAppService {
         prompt.append("【精确修改请求】\n\n");
         prompt.append("目标 CSS 选择器（已精确定位，无需分析）：\n");
         prompt.append(elementSelector).append("\n\n");
-        prompt.append("修改类型：样式修改（仅作用于该元素）\n");
+        prompt.append("修改类型：按具体要求修改目标元素。\n");
+        prompt.append("如果要求涉及图片：只在该元素内部新增或替换一个 img，src 使用主体一致的 IMG_n。\n");
+        prompt.append("其他元素上的 KEEP_n 是已有图片地址，必须原样保留。\n");
         prompt.append("具体要求：").append(ImageSearchService.hideUrls(newContent)).append("\n\n");
         if (elementSelector != null && elementSelector.contains(":nth-child(")) {
             prompt.append("⚠ 注意：该选择器包含 nth-child，表示这是列表中的一个单独元素。\n");
@@ -607,11 +628,11 @@ public class AppServiceImpl implements IAppService {
                 "====================",
                 "【硬性修改规则（不可违反）】",
                 "1. 只允许修改该选择器命中的“单一元素”。",
-                "2. 禁止修改任何兄弟元素、父元素或子元素。",
-                "3. 禁止新增、删除、重排任何 DOM 结构。",
+                "2. 禁止修改兄弟元素和父元素。",
+                "3. 禁止改动目标元素以外的 DOM。目标元素内部允许新增或替换一个 img 来放配图。",
                 "4. 禁止修改任何全局 CSS、公共 class 或选择器。",
                 hasStockImages
-                        ? "5. 需要更换图片时，只使用「可用图片」里主体与该元素一致的 IMG_n，禁止编造网址，禁止套用不相关的图。"
+                        ? "5. 目标元素需要图片时，用主体一致的 IMG_n 作为 src。色块或文字占位要换成这张 img。其他位置的 KEEP_n 原样保留，禁止编造网址。"
                         : "5. 没有可用图片时不要编造无法访问的图片地址。",
                 "",
                 "====================",

@@ -354,15 +354,13 @@ const loadChatHistory = async (reset = false) => {
     });
 
     if (result && result.list) {
-      const newMessages = result.list;
+      // 接口按 id 倒序返回，页面从上到下要按时间正序
+      const ordered = [...result.list].reverse();
 
       if (reset) {
-        // 重置时直接替换
-        chatHistory.value = newMessages;
-        isInitialLoad.value = false;
+        chatHistory.value = ordered;
       } else {
-        // 加载更多时，将新消息插入到数组前面（因为历史消息是倒序的）
-        chatHistory.value = [...newMessages, ...chatHistory.value];
+        chatHistory.value = [...ordered, ...chatHistory.value];
       }
 
       chatTotals.value = result.totals || 0;
@@ -370,7 +368,7 @@ const loadChatHistory = async (reset = false) => {
 
       // 判断是否还有更多历史消息
       // 如果返回的消息数少于每页大小，或者当前页已经是最后一页，则没有更多了
-      if (newMessages.length < chatPageSize.value || chatPageNo.value >= chatTotalPages.value) {
+      if (ordered.length < chatPageSize.value || chatPageNo.value >= chatTotalPages.value) {
         hasMoreHistory.value = false;
       } else {
         hasMoreHistory.value = true;
@@ -411,16 +409,33 @@ const loadMoreHistory = async () => {
   container.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
 };
 
-// 滚动到底部。长消息渲染后高度还会变，下一帧再对齐一次
+// 首次进入时把视口钉在最新消息，避免滚动事件在顶部把更早的记录拉进来
+const pinningToLatest = ref(false);
+let pinDepth = 0;
+
 const scrollToBottom = () => {
-  nextTick(() => {
+  const apply = () => {
     const container = messagesContainer.value;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
+  };
+  pinDepth += 1;
+  pinningToLatest.value = true;
+  const release = () => {
+    pinDepth -= 1;
+    if (pinDepth <= 0) {
+      pinDepth = 0;
+      pinningToLatest.value = false;
+    }
+  };
+  nextTick(() => {
+    apply();
     requestAnimationFrame(() => {
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-      }
+      apply();
+      requestAnimationFrame(() => {
+        apply();
+        release();
+      });
     });
   });
 };
@@ -432,6 +447,8 @@ const scrollToBottom = () => {
 const handleScroll = () => {
   const container = messagesContainer.value;
   if (!container) return;
+
+  if (pinningToLatest.value || isInitialLoad.value) return;
 
   // 滚动到顶部附近，且有更多历史，且当前没有正在加载时，触发加载更多
   if (container.scrollTop < 50 && hasMoreHistory.value && !isLoadingHistory.value) {
@@ -796,13 +813,14 @@ const updateProgressFailed = (progressMessage) => {
 const initChatHistory = async (initialMessages = []) => {
   if (initialMessages && initialMessages.length > 0) {
     chatHistory.value = initialMessages;
-    await nextTick();
-    scrollToBottom();
   } else if (props.appId) {
     await loadChatHistory(true);
-    await nextTick();
-    scrollToBottom();
   }
+  await nextTick();
+  scrollToBottom();
+  isInitialLoad.value = false;
+  await nextTick();
+  scrollToBottom();
 };
 
 // 添加消息到聊天历史

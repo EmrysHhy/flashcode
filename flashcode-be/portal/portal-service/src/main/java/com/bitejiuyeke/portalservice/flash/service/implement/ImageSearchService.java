@@ -53,10 +53,10 @@ import java.util.regex.Pattern;
 public class ImageSearchService {
 
     private static final int QUERY_MAX_LEN = 80;
-    private static final int KEYWORD_COUNT = 3;
+    private static final int KEYWORD_COUNT = 8;
     private static final int IMAGE_COUNT = 8;
-    /** 每个搜图词最多收 3 张，三条词加起来不超过 8 张。 */
-    private static final int IMAGES_PER_QUERY = 3;
+    /** 每个主体只收 1 张，把 8 张名额留给不同对象。 */
+    private static final int IMAGES_PER_QUERY = 1;
     private static final int MAX_IMAGE_BYTES = 1024 * 1024;
     private static final Duration DOWNLOAD_CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration DOWNLOAD_READ_TIMEOUT = Duration.ofSeconds(4);
@@ -101,7 +101,7 @@ public class ImageSearchService {
 
     /**
      * 按需求或编辑说明搜配图，并立刻开始把图片转存到 OSS。
-     * 规则：先让模型写 3 条搜图词，再逐条通过 MCP 调 search_images；
+     * 规则：先让模型按页面上的对象各写一条搜图词，最多 8 条；
      * 模型没有有效词时退回规则词，只搜一次。下载和上传与后续写代码并行，
      * 单张不超过 1MB。连不上、超时或转存失败时，对应 IMG_n 不换回外链。
      */
@@ -328,17 +328,18 @@ public class ImageSearchService {
     /**
      * 让模型根据需求写出搜图词。
      * 规则：只写页面要展示的实物、品牌、地点或人物；不写界面、卡片、评分这类页面结构；
-     * 不写入聊天记录；最多 3 条，失败返回空列表。
+     * 不写入聊天记录；每个对象一条，最多 8 条，失败返回空列表。
      */
     private List<String> keywordsFromModel(String requirement) {
         try {
             String text = ChatContentSupport.collect(chatClient.prompt()
                     .system("""
                             你只负责写图片搜索词。
-                            从用户内容里找出页面真正要展示的实物、品牌、地点或人物，每个对象一行。
-                            每行 4 到 12 个字，必须能搜到该对象的照片。例如：公牛墙壁插座、小米智能插座。
+                            从用户内容里列出页面要分别展示的实物、品牌、地点或人物，每个对象单独一行。
+                            列表里有多项时，每一项都要有自己的一行，不要只写前三个。
+                            每行 4 到 12 个字，必须能搜到该对象的照片。例如：小黄雏鸡、橘猫、柯基、小猪、绵羊。
                             不要写界面、系统、网页、截图、卡片、列表、评分、排行、推荐、应用、后台。
-                            不要解释，不要序号，不要代码，不要输出网址。最多 3 行。""")
+                            不要解释，不要序号，不要代码，不要输出网址。最多 8 行。""")
                     .user(hideUrls(requirement)));
             return parseKeywords(text);
         } catch (Exception e) {
@@ -349,7 +350,7 @@ public class ImageSearchService {
 
     /**
      * 解析模型输出的搜图词。
-     * 规则：去掉序号和空行，跳过代码块和界面类词，最多 3 条。
+     * 规则：去掉序号和空行，跳过代码块和界面类词，最多 8 条。
      */
     static List<String> parseKeywords(String text) {
         if (text == null || text.isBlank()) {
@@ -537,9 +538,10 @@ public class ImageSearchService {
         StringBuilder hint = new StringBuilder("""
 
                 【可用图片】
-                每行冒号前是这张照片的主体，冒号后是唯一可用的 src。不要写网址。
+                新配图的 src 只能写下面的 IMG_n，不要写网址。
                 只把图片用在主体一致的那一项上。主体对不上就不要用，改用色块。
                 禁止把软件界面、网页截图套到产品或品牌上。
+                文件里已经存在的 KEEP_n 是原有图片地址，必须原样保留。
                 """);
         for (int i = 0; i < images.size(); i++) {
             StockImageDTO hit = images.get(i);
