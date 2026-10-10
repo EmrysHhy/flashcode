@@ -9,6 +9,22 @@
           <p class="brand-desc">让零代码开发变得更简单、更高效、更智能</p>
         </div>
 
+        <div class="intro">
+          <p>说一句话，生成可运行的应用</p>
+          <p>简单页面、能点的网站、带后台的小系统，都可以做</p>
+          <p>先看效果，再改内容，满意了就分享给别人</p>
+        </div>
+
+        <a
+          class="github"
+          href="https://github.com/EmrysHhy/flashcode"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img :src="githubIcon" alt="" />
+          <span>Github</span>
+        </a>
+
         <div class="nav-section">
           <h4 class="section-title">关于我们</h4>
           <a href="/about" class="link">项目说明</a>
@@ -28,6 +44,7 @@
 
 <script setup>
 const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
+const githubIcon = new URL('@/imges/wxCode.webp', import.meta.url).href;
 </script>
 
 <style scoped lang="scss">
@@ -48,10 +65,26 @@ const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  column-gap: 72px;
+  grid-template-columns: max-content 1fr 88px max-content;
+  align-items: stretch;
+  column-gap: 40px;
   margin-bottom: 40px;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  text-align: center;
+}
+
+.intro p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .brand-section {
@@ -70,10 +103,10 @@ const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
 }
 
 .brand-desc {
-  max-width: 280px;
   margin: 0;
   font-size: 14px;
   line-height: 1.7;
+  white-space: nowrap;
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -101,6 +134,29 @@ const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
 }
 
 .link:hover {
+  color: #ffffff;
+}
+
+.github {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+}
+
+.github img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.github:hover {
   color: #ffffff;
 }
 
@@ -144,13 +200,22 @@ const logoSrc = new URL('@/imges/logoFooter.webp', import.meta.url).href;
   }
 
   .main-content {
-    grid-template-columns: 1fr 1fr;
-    row-gap: 32px;
+    grid-template-columns: 1fr auto;
+    row-gap: 28px;
     column-gap: 24px;
   }
 
-  .brand-section {
+  .brand-desc {
+    white-space: normal;
+  }
+
+  .intro,
+  .github {
     grid-column: 1 / -1;
+  }
+
+  .intro {
+    grid-row: 1;
   }
 }
 

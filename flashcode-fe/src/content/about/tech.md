@@ -46,8 +46,6 @@
 | 前端 | Vue 3 | 门户框架，Vite 构建。生成出的用户应用也以 Vue 3 为主，预览和广场沿用同一套组件模型。 |
 | 前端 | Element Plus | 登录、列表和表单。 |
 
-[Github](https://github.com/EmrysHhy/flashcode)
-
 
 
 
